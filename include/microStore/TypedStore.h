@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include "Codec.h"
+
 #include <vector>
 
 namespace microStore {

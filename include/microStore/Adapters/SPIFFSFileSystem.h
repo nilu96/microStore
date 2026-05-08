@@ -113,6 +113,7 @@ protected:
 					if (init_test.write("test", 4) == 4) {
 						verified = true;
 					}
+					init_test.close();
 				}
 				if (!verified) {
 					printf("[ustore] WARNING: FlashFSFileSystem check failed, reformatting!\n");

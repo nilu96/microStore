@@ -137,8 +137,12 @@ public:
 	inline bool isValid() const { if (!_filesystem) return false; return true; }
 	inline operator bool() const { return isValid(); }
 
-	bool init(FileSystem& filesystem, const char* prefix, bool clearOnInit = false)
+	bool init(FileSystem& filesystem, const char* prefix, bool clearOnInit = false, uint32_t segment_size = 0, uint8_t segment_count = 0)
 	{
+		if (segment_size > 0) _segment_size = segment_size;
+		if (segment_count > 0) _segment_count = segment_count;
+		printf("[ustore] init: Initializing FileStore with prefix=%s, segment_size=%lu, segment_count=%u\n", prefix, _segment_size, _segment_count);
+
 		_filesystem = filesystem;
 		strncpy(base_prefix,prefix,sizeof(base_prefix));
 
@@ -333,7 +337,7 @@ printf("[ustore] get: fetching key %s with data size %u\n", bin_str(key, key_len
 			printf("[ustore] get: key %s not found in index\n", bin_str(key, key_len));
 			return false;
 		}
-printf("[ustore] get: key %s offset %lu\n", bin_str(key, key_len), e->offset);
+//printf("[ustore] get: key %s offset %lu\n", bin_str(key, key_len), e->offset);
 
 		if (is_ttl_expired_(e->timestamp, e->ttl)) {
 			index_remove(key, key_len);
@@ -356,7 +360,7 @@ printf("[ustore] get: key %s offset %lu\n", bin_str(key, key_len), e->offset);
 
 		//if (f.read(&hdr, sizeof(hdr)) != sizeof(hdr)) {
 		size_t len = f.read(&hdr, sizeof(hdr));
-printf("[ustore] get: key %s read header of size %u\n", bin_str(key, key_len), len);
+//printf("[ustore] get: key %s read header of size %u\n", bin_str(key, key_len), len);
 		if (len != sizeof(hdr)) {
 			printf("[ustore] get: key %s header read failed\n", bin_str(key, key_len));
 			f.close();

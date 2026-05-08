@@ -90,25 +90,25 @@ protected:
 			// Adafruit_LittleFS File::seek() only supports absolute seeks (SEEK_SET).
 			// Emulate SEEK_CUR and SEEK_END by computing the absolute target position.
 			uint32_t target;
-printf("[ustore] InternalFS: pre-position=%lu\n", _file->position());
+//printf("[ustore] InternalFS: pre-position=%lu\n", _file->position());
 			switch (mode) {
 				case microStore::SeekMode::SeekModeCur:
 					target = _file->position() + pos;
-printf("[ustore] InternalFS: SeekModeCur pos=%lu, target=%lu\n", pos, target);
+//printf("[ustore] InternalFS: SeekModeCur pos=%lu, target=%lu\n", pos, target);
 					break;
 				case microStore::SeekMode::SeekModeEnd:
 					target = _file->size() + pos;
-printf("[ustore] InternalFS: SeekModeEnd pos=%lu, target=%lu\n", pos, target);
+//printf("[ustore] InternalFS: SeekModeEnd pos=%lu, target=%lu\n", pos, target);
 					break;
 				case microStore::SeekMode::SeekModeSet:
 				default:
 					target = pos;
-printf("[ustore] InternalFS: SeekModeSet pos=%lu, target=%lu\n", pos, target);
+//printf("[ustore] InternalFS: SeekModeSet pos=%lu, target=%lu\n", pos, target);
 					break;
 			}
 			//return _file->seek(target) ? (long)target : -1L;
 			long new_pos = _file->seek(target) ? (long)target : -1L;
-printf("[ustore] InternalFS: new_pos=%ld, post-position=%lu\n", new_pos, _file->position());
+//printf("[ustore] InternalFS: new_pos=%ld, post-position=%lu\n", new_pos, _file->position());
 			return new_pos;
 		}
 /**/

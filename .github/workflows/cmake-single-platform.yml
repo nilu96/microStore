@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        env: [heltec_wifi_lora_32_V3, wiscore_rak4631]
+        env: [ttgo-lora32-v21, heltec_wifi_lora_32_V3, wiscore_rak4631]
 
     steps:
       - uses: actions/checkout@v4

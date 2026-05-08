@@ -1293,53 +1293,32 @@ printf("[ustore] Opening tmp file: %s\n", tmp_name);
 		File outf = _filesystem.open(tmp_name, File::ModeWrite);
 		if (!outf) { clear_journal(); return false; }
 
-		// --- Phase 2: build per-segment sorted lists of live offsets ---
-
-		// Apply policies before building the live-record lists so that expired
-		// and excess records are excluded from the compaction output.
-		prune_index_to_max_recs_();
-
-		struct LiveRec {
-			uint32_t offset;
-			KeyType key;
-		};
-		using LiveRecVec = std::vector<LiveRec, rebind_alloc<LiveRec>>;
-		rebind_alloc<LiveRec> lr_alloc(_alloc);
-		LiveRecVec per_seg[_segment_count];
-		for (auto& v : per_seg) {
-			v = LiveRecVec(lr_alloc);
-		}
-
-		// CBA TODO: Optimize memory usage required for the following operation
-		for (auto& kv : _index) {
-printf("[ustore] Calling is_ttl_expired_ with ttl: %u, ts: %u, now: %u\n", kv.second.ttl, kv.second.timestamp, microStore::time());
-			if (is_ttl_expired_(kv.second.timestamp, kv.second.ttl)) continue;
-			uint32_t seg = kv.second.segment;
-			if (seg < _segment_count) {
-				LiveRec lr;
-				lr.offset = kv.second.offset;
-				lr.key = kv.first;
-printf("[ustore] Pushing segment: %u, offset: %u\n", seg, lr.offset);
-				per_seg[seg].push_back(lr);
-			}
-		}
-		for (uint32_t s = 0; s < _segment_count; s++) {
-			std::sort(per_seg[s].begin(), per_seg[s].end(), [](const LiveRec& a, const LiveRec& b) {
-				return a.offset < b.offset;
-			});
-		}
-
-		// --- Phase 3: process segments one at a time ---
+		// --- Phase 2 + 3 fused: stream live offsets one segment at a time ---
 		// For each segment s:
-		//   1. Copy live records from s to compact.tmp.
-		//   2. Flush compact.tmp to disk.
-		//   3. Write journal (next_seg=s+1, tmp_valid_size=current byte count).
-		//   4. Delete source segment s.
-		// Steps 3 and 4 MUST be in this order: the journal is updated BEFORE the source
-		// segment is deleted. If power fails between step 3 and step 4, the next boot's
+		//   1. Walk _index to collect live offsets in segment s into a single
+		//      reusable vector (clear() retains capacity across iterations).
+		//   2. Sort by offset for sequential disk access.
+		//   3. Copy live records from s to compact.tmp.
+		//   4. Flush compact.tmp to disk.
+		//   5. Write journal (next_seg=s+1, tmp_valid_size=current byte count).
+		//   6. Delete source segment s.
+		// Steps 5 and 6 MUST be in this order: the journal is updated BEFORE the source
+		// segment is deleted. If power fails between step 5 and step 6, the next boot's
 		// recover_if_needed() sees next_seg=s+1 and renames compact.tmp to segment 0, then
 		// finalize_compaction() deletes the still-present segment s — no data is lost.
 		//
+		// _index must not be inserted into or erased from between here and Phase 4
+		// (prune_index_to_max_recs_ runs before, finalize_compaction runs after) so
+		// the per-segment re-iteration is stable.
+
+		// Apply policies before enumerating live records so that expired and excess
+		// records are excluded from the compaction output.
+		prune_index_to_max_recs_();
+
+		using OffVec = std::vector<uint32_t, rebind_alloc<uint32_t>>;
+		rebind_alloc<uint32_t> off_alloc(_alloc);
+		OffVec offsets(off_alloc);
+
 		// Static to avoid placing 1 KB on the stack — compact() is not re-entrant.
 		uint8_t key_buf[USTORE_MAX_KEY_LEN];
 		static uint8_t val_buf[USTORE_MAX_VALUE_LEN];
@@ -1347,16 +1326,24 @@ printf("[ustore] Pushing segment: %u, offset: %u\n", seg, lr.offset);
 		uint32_t committed_segs = 0;  // number of source segments committed to compact.tmp
 
 		for (uint32_t s = 0; s < _segment_count; s++) {
-printf("[ustore] Processing segment: %u, size: %lu\n", s, per_seg[s].size());
+			offsets.clear();
+			for (auto& kv : _index) {
+				if (kv.second.segment != s) continue;
+				if (is_ttl_expired_(kv.second.timestamp, kv.second.ttl)) continue;
+				offsets.push_back(kv.second.offset);
+			}
+			std::sort(offsets.begin(), offsets.end());
+
+printf("[ustore] Processing segment: %u, size: %lu\n", s, (unsigned long)offsets.size());
 			char src_name[USTORE_MAX_FILENAME_LEN]; segment_name(s, src_name);
-			if (!per_seg[s].empty()) {
+			if (!offsets.empty()) {
 printf("[ustore] Opening src file: %s\n", src_name);
 				File src = _filesystem.open(src_name, File::ModeRead);
 				if (src) {
-					for (size_t i = 0; i < per_seg[s].size(); i++) {
-						LiveRec& lr = per_seg[s][i];
-printf("[ustore] Processing record: %u offset: %lu\n", i, lr.offset);
-						src.seek((long)lr.offset, SeekModeSet);
+					for (size_t i = 0; i < offsets.size(); i++) {
+						uint32_t off = offsets[i];
+printf("[ustore] Processing record: %u offset: %lu\n", (unsigned)i, (unsigned long)off);
+						src.seek((long)off, SeekModeSet);
 						RecordHeader hdr;
 						if (src.read(&hdr, sizeof(hdr)) != sizeof(hdr)) {
 printf("[ustore] WARNING: Failed to read record header\n");

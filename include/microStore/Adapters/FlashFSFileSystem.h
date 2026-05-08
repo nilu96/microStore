@@ -134,13 +134,15 @@ protected:
 	public:
 
 		virtual bool format() override {
+			printf("[ustore] Formatting FlashFSFileSystem\n");
 			if (!FlashFS.format()) {
+				printf("[ustore] Failed to format FlashFSFileSystem!\n");
 				return false;
 			}
 			return true;
 		}
 
-		virtual bool init() override {
+		virtual bool init(bool reformatOnFail = true) override {
 			printf("[ustore] Initializing FlashFSFileSystem\n");
 			// Initialize FlashFSFileSystem
 			if (!_device) {
@@ -148,22 +150,31 @@ protected:
 				return false;
 			}
 			if (!_flash.begin(_device)) {
-				printf("[ustore] Failed to initialize device for FlashFSFileSystem!\n");
+				printf("[ustore] ERROR: Failed to initialize device for FlashFSFileSystem!\n");
 				return false;
 			}
 			if (!FlashFS.begin(&_flash)) {
-				printf("[ustore] Failed to initialize FlashFSFileSystem!\n");
+				printf("[ustore] ERROR: Failed to initialize FlashFSFileSystem!\n");
 				return false;
 			}
-	/*
-			// Ensure filesystem is writable and reformat if not
-			if (writeFile("/test", "test", 4) < 4) {
-				format();
+			if (reformatOnFail) {
+				// Ensure filesystem is writable and reformat if not
+				bool verified = false;
+				microStore::File init_test = open("/__init_test__", microStore::File::ModeWrite, true);
+				if (init_test) {
+					if (init_test.write("test", 4) == 4) {
+						verified = true;
+					}
+				}
+				if (!verified) {
+					printf("[ustore] WARNING: FlashFSFileSystem check failed, reformatting!\n");
+					format();
+				}
+				else {
+					remove("/__init_test__");
+					printf("[ustore] FlashFSFileSystem check passed!\n");
+				}
 			}
-			else {
-				remove("/test");
-			}
-	*/
 			return true;
 		}
 

@@ -90,28 +90,39 @@ protected:
 	public:
 
 		virtual bool format() override {
+			printf("[ustore] Formatting SPIFFSFileSystem\n");
 			if (!SPIFFS.format()) {
+				printf("[ustore] Failed to format SPIFFSFileSystem!\n");
 				return false;
 			}
 			return true;
 		}
 
-		virtual bool init() override {
+		virtual bool init(bool reformatOnFail = true) override {
 			printf("[ustore] Initializing SPIFFSFileSystem\n");
 			// Initialize SPIFFS
 			if (!SPIFFS.begin(true, "")) {
 				printf("[ustore] Failed to initialize SPIFFSFileSystem!\n");
 				return false;
 			}
-	/*
-			// Ensure filesystem is writable and reformat if not
-			if (writeFile("/test", "test", 4) < 4) {
-				format();
+			if (reformatOnFail) {
+				// Ensure filesystem is writable and reformat if not
+				bool verified = false;
+				microStore::File init_test = open("/__init_test__", microStore::File::ModeWrite, true);
+				if (init_test) {
+					if (init_test.write("test", 4) == 4) {
+						verified = true;
+					}
+				}
+				if (!verified) {
+					printf("[ustore] WARNING: FlashFSFileSystem check failed, reformatting!\n");
+					format();
+				}
+				else {
+					remove("/__init_test__");
+					printf("[ustore] FlashFSFileSystem check passed!\n");
+				}
 			}
-			else {
-				remove("/test");
-			}
-	*/
 			return true;
 		}
 

@@ -113,7 +113,7 @@ public:
 		return ch;
 	}
 	inline size_t write(uint8_t byte) { assert(_impl); _crc = crc32(_crc, byte); return _impl->write(byte); }
-	inline size_t read(uint8_t* buffer, size_t size) { assert(_impl); size_t read = _impl->read(buffer, size); _crc = crc32(_crc, buffer, read); return read; }
+	inline size_t read(uint8_t* buffer, size_t size) { assert(_impl); size_t read = _impl->read(buffer, size); if (read > 0 && read != -1) _crc = crc32(_crc, buffer, read); return read; }
 	inline size_t read(void* buffer, size_t size) { return read((uint8_t*)buffer, size); }
 	inline size_t write(const uint8_t* buffer, size_t size) { assert(_impl); _crc = crc32(_crc, buffer, size); return _impl->write(buffer, size); }
 	inline size_t write(const void* buffer, size_t size) { return write((const uint8_t*)buffer, size); }

@@ -39,7 +39,7 @@ public:
 
 protected:
 	virtual bool format() { return false; }
-	virtual bool init() { return true; }
+	virtual bool init(bool reformatOnFail = true) { return true; }
 	virtual void loop() {}
 
 	// Factory
@@ -94,7 +94,7 @@ public:
 
 public:
 	inline bool format() { assert(_impl); return _impl->format(); }
-	inline bool init() { assert(_impl); return _impl->init(); }
+	inline bool init(bool reformatOnFail = true) { assert(_impl); return _impl->init(reformatOnFail); }
 	inline void loop() { assert(_impl); _impl->loop(); }
 
 	// Factory

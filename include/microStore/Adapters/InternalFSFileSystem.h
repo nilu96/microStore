@@ -20,8 +20,6 @@
 #include "../FileSystem.h"
 
 #include <InternalFileSystem.h>
-//#define NS Adafruit_LittleFS_Namespace
-//#define NS Adafruit_LittleFS
 
 namespace microStore { namespace Adapters {
 
@@ -87,24 +85,33 @@ protected:
 			return _file->seek(pos, smode);
 		}
 */
+/**/
 		inline virtual long seek(uint32_t pos, microStore::SeekMode mode) {
 			// Adafruit_LittleFS File::seek() only supports absolute seeks (SEEK_SET).
 			// Emulate SEEK_CUR and SEEK_END by computing the absolute target position.
 			uint32_t target;
+printf("[ustore] InternalFS: pre-position=%lu\n", _file->position());
 			switch (mode) {
 				case microStore::SeekMode::SeekModeCur:
 					target = _file->position() + pos;
+printf("[ustore] InternalFS: SeekModeCur pos=%lu, target=%lu\n", pos, target);
 					break;
 				case microStore::SeekMode::SeekModeEnd:
 					target = _file->size() + pos;
+printf("[ustore] InternalFS: SeekModeEnd pos=%lu, target=%lu\n", pos, target);
 					break;
 				case microStore::SeekMode::SeekModeSet:
 				default:
 					target = pos;
+printf("[ustore] InternalFS: SeekModeSet pos=%lu, target=%lu\n", pos, target);
 					break;
 			}
-			return _file->seek(target) ? (long)target : -1L;
+			//return _file->seek(target) ? (long)target : -1L;
+			long new_pos = _file->seek(target) ? (long)target : -1L;
+printf("[ustore] InternalFS: new_pos=%ld, post-position=%lu\n", new_pos, _file->position());
+			return new_pos;
 		}
+/**/
 		inline virtual void flush() { _file->flush(); }
 
 		inline virtual bool isValid() const { if (!_file) return false; return !_closed; }
@@ -120,28 +127,39 @@ protected:
 	public:
 
 		virtual bool format() override {
+			printf("[ustore] Formatting InternalFSFileSystem\n");
 			if (!InternalFS.format()) {
+				printf("[ustore] Failed to format InternalFSFileSystem!\n");
 				return false;
 			}
 			return true;
 		}
 
-		virtual bool init() override {
+		virtual bool init(bool reformatOnFail = true) override {
 			printf("[ustore] Initializing InternalFileSystem\n");
 			// Initialize InternalFileSystem
 			if (!InternalFS.begin()) {
 				printf("[ustore] Failed to initialize InternalFSFileSystem!\n");
 				return false;
 			}
-	/*
-			// Ensure filesystem is writable and reformat if not
-			if (writeFile("/test", "test", 4) < 4) {
-				format();
+			if (reformatOnFail) {
+				// Ensure filesystem is writable and reformat if not
+				bool verified = false;
+				microStore::File init_test = open("/__init_test__", microStore::File::ModeWrite, true);
+				if (init_test) {
+					if (init_test.write("test", 4) == 4) {
+						verified = true;
+					}
+				}
+				if (!verified) {
+					printf("[ustore] WARNING: FlashFSFileSystem check failed, reformatting!\n");
+					format();
+				}
+				else {
+					remove("/__init_test__");
+					printf("[ustore] FlashFSFileSystem check passed!\n");
+				}
 			}
-			else {
-				remove("/test");
-			}
-	*/
 			return true;
 		}
 

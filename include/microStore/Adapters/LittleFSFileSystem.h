@@ -90,26 +90,39 @@ protected:
 	public:
 
 		inline virtual bool format() override {
-			if (!LittleFS.format()) return false;
+			printf("[ustore] Formatting LittleFSFileSystem\n");
+			if (!LittleFS.format()) {
+				printf("[ustore] Failed to format LittleFSFileSystem!\n");
+				return false;
+			}
 			return true;
 		}
 
-		inline virtual bool init() override {
+		inline virtual bool init(bool reformatOnFail = true) override {
 			printf("[ustore] Initializing LittleFSFileSystem\n");
 			// Initialize LittleFS
 			if (!LittleFS.begin(true, "")) {
 				printf("[ustore] Failed to initialize LittleFSFileSystem!\n");
 				return false;
 			}
-	/*
-			// Ensure filesystem is writable and reformat if not
-			if (writeFile("/test", "test", 4) < 4) {
-				format();
+			if (reformatOnFail) {
+				// Ensure filesystem is writable and reformat if not
+				bool verified = false;
+				microStore::File init_test = open("/__init_test__", microStore::File::ModeWrite, true);
+				if (init_test) {
+					if (init_test.write("test", 4) == 4) {
+						verified = true;
+					}
+				}
+				if (!verified) {
+					printf("[ustore] WARNING: FlashFSFileSystem check failed, reformatting!\n");
+					format();
+				}
+				else {
+					remove("/__init_test__");
+					printf("[ustore] FlashFSFileSystem check passed!\n");
+				}
 			}
-			else {
-				remove("/test");
-			}
-	*/
 			return true;
 		}
 

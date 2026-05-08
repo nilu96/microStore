@@ -50,7 +50,9 @@
 #if defined(USTORE_USE_UNIVERSALFS)
 #include "microStore/Adapters/UniversalFileSystem.h"
 #endif
+#if defined(USTORE_USE_NOOPFS)
 #include "microStore/Adapters/NoopFileSystem.h"
+#endif
 
 void setup() {
 
@@ -76,39 +78,110 @@ void setup() {
 #endif
 #endif
 
-#if 0
 #if defined(USTORE_USE_POSIXFS)
-	microStore::FileSystem filesystem{microStore::Adapters::PosixFileSystem()};
-	filesystem.init();
-    microStore::FileStore filestore;
+	{
+		printf("Testing PosixFileSystem...\n");
+		microStore::FileSystem filesystem{microStore::Adapters::PosixFileSystem()};
+		if (filesystem.init()) {
+			printf("size=%u available=%u\n", filesystem.storageSize(), filesystem.storageAvailable());
+			microStore::FileStore filestore;
 #if defined(ARDUINO)
-    filestore.init(filesystem, "/test_filestore");
+		    if (filestore.init(filesystem, "/pfs_filestore")) {
 #else
-    filestore.init(filesystem, "test_filestore");
+    		if (filestore.init(filesystem, "pfs_filestore")) {
 #endif
-	printf("put: foo=bar\n");
-	filestore.put("foo", "bar");
-	std::string value;
-	filestore.get("foo", value);
-	printf("got: foo=%s\n", value.c_str());
+				filestore.clear();
+				printf("put: foo=bar\n");
+				filestore.put("foo", "bar");
+				std::string value;
+				filestore.get("foo", value);
+				printf("got: foo=%s\n", value.c_str());
+			}
+		}
+	}
 #endif
+#if defined(USTORE_USE_STDIOFS)
 #endif
-
+#if defined(USTORE_USE_LITTLEFS)
+#endif
+#if defined(USTORE_USE_SPIFFS)
+#endif
+#if defined(USTORE_USE_INTERNALFS)
+#endif
+#if defined(USTORE_USE_FLASHFS)
+	{
+		printf("Testing FlashFSFileSystem...\n");
+		static const SPIFlash_Device_t device = RAK15001;
+		microStore::FileSystem filesystem{microStore::Adapters::FlashFSFileSystem(&device)};
+		if (filesystem.init()) {
+			//filesystem.format();
+			printf("size=%u available=%u\n", filesystem.storageSize(), filesystem.storageAvailable());
+			microStore::FileStore filestore;
+#if defined(ARDUINO)
+		    if (filestore.init(filesystem, "/ffs_typedstore")) {
+#else
+    		if (filestore.init(filesystem, "ffs_typedstore")) {
+#endif
+				filestore.clear();
+				microStore::TypedStore<std::string, std::string, microStore::FileStore> store(filestore);
+				printf("put: foo=bar\n");
+				store.put("foo", "bar");
+				std::string value;
+				store.get("foo", value);
+				printf("got: foo=%s\n", value.c_str());
+			}
+		}
+	}
+#endif
+#if defined(USTORE_USE_SD)
+	{
+		printf("Testing SDFileSystem...\n");
+		microStore::FileSystem filesystem{microStore::Adapters::SDFileSystem(SDCARD_SCLK, SDCARD_MISO, SDCARD_MOSI, SDCARD_CS)};
+		if (filesystem.init()) {
+			//filesystem.format();
+			printf("size=%u available=%u\n", filesystem.storageSize(), filesystem.storageAvailable());
+			microStore::FileStore filestore;
+#if defined(ARDUINO)
+		    if (filestore.init(filesystem, "/sdfs_typedstore")) {
+#else
+    		if (filestore.init(filesystem, "sdfs_typedstore")) {
+#endif
+				filestore.clear();
+				microStore::TypedStore<std::string, std::string, microStore::FileStore> store(filestore);
+				printf("put: foo=bar\n");
+				store.put("foo", "bar");
+				std::string value;
+				store.get("foo", value);
+				printf("got: foo=%s\n", value.c_str());
+			}
+		}
+	}
+#endif
 #if defined(USTORE_USE_UNIVERSALFS)
-	microStore::FileSystem filesystem{microStore::Adapters::UniversalFileSystem()};
-	filesystem.init();
-	microStore::FileStore filestore;
+	{
+		printf("Testing UniversalFileSystem...\n");
+		microStore::FileSystem filesystem{microStore::Adapters::UniversalFileSystem()};
+		if (filesystem.init()) {
+			//filesystem.format();
+			printf("size=%u available=%u\n", filesystem.storageSize(), filesystem.storageAvailable());
+			microStore::FileStore filestore;
 #if defined(ARDUINO)
-    filestore.init(filesystem, "/test_typedstore");
+		    if (filestore.init(filesystem, "/ufs_typedstore")) {
 #else
-    filestore.init(filesystem, "test_typedstore");
+    		if (filestore.init(filesystem, "ufs_typedstore")) {
 #endif
-	microStore::TypedStore<std::string, std::string, microStore::FileStore> store(filestore);
-	printf("put: foo=bar\n");
-	store.put("foo", "bar");
-	std::string value;
-	store.get("foo", value);
-	printf("got: foo=%s\n", value.c_str());
+				filestore.clear();
+				microStore::TypedStore<std::string, std::string, microStore::FileStore> store(filestore);
+				printf("put: foo=bar\n");
+				store.put("foo", "bar");
+				std::string value;
+				store.get("foo", value);
+				printf("got: foo=%s\n", value.c_str());
+			}
+		}
+	}
+#endif
+#if defined(USTORE_USE_NOOPFS)
 #endif
 
 }

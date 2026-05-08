@@ -54,7 +54,12 @@ public:
     inline bool isValid() const { return true; }
 	inline operator bool() const { return isValid(); }
 
-    bool init() { return true; }
+    bool init(bool clearOnInit = false) {
+		if (clearOnInit) {
+			clear();
+		}
+        return true;
+    }
 
     /* -------- PUT -------- */
 

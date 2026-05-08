@@ -95,15 +95,16 @@ protected:
 	public:
 
 		virtual bool format() override {
-			/*
-			if (!SD.format()) {
-				return false;
-			}
-			*/
+			// CBA No format in SDFS?
+			//printf("[ustore] Formatting SDFileSystem\n");
+			//if (!SD.format()) {
+//				printf("[ustore] Failed to format SDFileSystem!\n");
+			//	return false;
+			//}
 			return true;
 		}
 
-		virtual bool init() override {
+		virtual bool init(bool reformatOnFail = true) override {
 			printf("[ustore] Initializing SDFileSystem\n");
 			// Initialize SDFileSystem
 			pinMode(_miso, INPUT_PULLUP);
@@ -112,15 +113,24 @@ protected:
 				printf("[ustore] Failed to initialize SD card for SDFileSystem!\n");
 				return false;
 			}
-	/*
-			// Ensure filesystem is writable and reformat if not
-			if (writeFile("/test", "test", 4) < 4) {
-				format();
+			if (reformatOnFail) {
+				// Ensure filesystem is writable and reformat if not
+				bool verified = false;
+				microStore::File init_test = open("/__init_test__", microStore::File::ModeWrite, true);
+				if (init_test) {
+					if (init_test.write("test", 4) == 4) {
+						verified = true;
+					}
+				}
+				if (!verified) {
+					printf("[ustore] WARNING: FlashFSFileSystem check failed, reformatting!\n");
+					format();
+				}
+				else {
+					remove("/__init_test__");
+					printf("[ustore] FlashFSFileSystem check passed!\n");
+				}
 			}
-			else {
-				remove("/test");
-			}
-	*/
 			return true;
 		}
 
@@ -131,6 +141,8 @@ protected:
 				// Read only. File must exist. ("r")
 				case microStore::File::ModeRead:
 					pmode = FILE_READ;
+					// CBA Avoid logs like "open(): <filename> does not exist, no permits for creation" when file does not exist
+					if (!exists(path)) return {};
 					break;
 				// Write only. Creates file or truncates existing file. ("w")
 				case microStore::File::ModeWrite:
@@ -154,7 +166,7 @@ protected:
 			}
 			// CBA Using copy constructor to obtain File*
 			fs::File* file = new fs::File(SD.open(path, pmode));
-			if (!file) {
+			if (file == nullptr || !(*file)) {
 				return {};
 			}
 			// Seek to beginning to overwrite (this is failing on nrf52)
@@ -171,6 +183,8 @@ protected:
 		}
 
 		virtual bool remove(const char* path) override {
+			// CBA Avoid logs like "remove(): <filename> does not exists or is directory" when file does not exist
+			if (!exists(path)) return false;
 			return SD.remove(path);
 		}
 

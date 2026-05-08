@@ -68,7 +68,7 @@ protected:
 	public:
 
 		inline virtual bool format() override { return false; }
-		inline virtual bool init() override { return false; }
+		inline virtual bool init(bool reformatOnFail = true) override { return false; }
 
 		inline virtual microStore::File open(const char* path, microStore::File::Mode mode, const bool create = false) override { return {}; }
 		inline virtual bool exists(const char* path) override { return false; }

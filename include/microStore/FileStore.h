@@ -137,10 +137,14 @@ public:
 	inline bool isValid() const { if (!_filesystem) return false; return true; }
 	inline operator bool() const { return isValid(); }
 
-	bool init(FileSystem& filesystem, const char* prefix)
+	bool init(FileSystem& filesystem, const char* prefix, bool clearOnInit = false)
 	{
 		_filesystem = filesystem;
 		strncpy(base_prefix,prefix,sizeof(base_prefix));
+
+		if (clearOnInit) {
+			clear();
+		}
 
 		recover_if_needed();
 
@@ -177,7 +181,10 @@ public:
 
 	void clear()
 	{
-        if (!isValid()) return;
+        if (!isValid()) {
+			printf("[ustore] clear: store is invalid, skipping!\n");
+			return;
+		}
 
 		char name[USTORE_MAX_FILENAME_LEN];
 
@@ -186,10 +193,12 @@ public:
 		for(uint32_t i = 0; i < _segment_count; i++)
 		{
 			segment_name(i,name);
+			//printf("[ustore] clear: removing segment file: %s\n", name);
 			_filesystem.remove(name);
 		}
 
 		index_name(name);
+		//printf("[ustore] clear: removing index file: %s\n", name);
 		_filesystem.remove(name);
 
 		_index.clear();
@@ -264,6 +273,7 @@ public:
 			prune_index_to_max_recs_();
 
 		persist_index_entry(key, key_len, current_segment, offset, ts, ttl);
+printf("[ustore] put: key %s offset %u\n", bin_str(key, key_len), offset);
 
 		current_offset += sizeof(hdr)+key_len+len+sizeof(c);
 
@@ -294,13 +304,23 @@ printf("[ustore] put: wrote key %s with data length %u\n", bin_str(key, key_len)
 		return put(key.data(), (uint8_t)key.size(), data.data(), (uint16_t)data.size(), ttl, ts);
 	}
 
+	inline bool put(const char* key, const std::string& data, uint32_t ttl = 0, uint32_t ts = microStore::time())
+	{
+		return put((const uint8_t*)key, (uint8_t)strlen(key), (const uint8_t*)data.c_str(), (uint16_t)data.length(), ttl, ts);
+	}
+
+	inline bool put(const std::string& key, const std::string& data, uint32_t ttl = 0, uint32_t ts = microStore::time())
+	{
+		return put((const uint8_t*)key.c_str(), (uint8_t)key.length(), (const uint8_t*)data.c_str(), (uint16_t)data.length(), ttl, ts);
+	}
+
 	/* -------- GET -------- */
 
 	bool get(const uint8_t* key, uint8_t key_len, uint8_t* out, uint16_t* size)
 	{
         if (!isValid()) return false;
 
-//printf("[ustore] get: fetching key %s with data size %u\n", bin_str(key, key_len), *size);
+printf("[ustore] get: fetching key %s with data size %u\n", bin_str(key, key_len), *size);
 		if (key_len > USTORE_MAX_KEY_LEN) {
 			printf("[ustore] get: failed due to excessive key length: %u\n", key_len);
 			return false;
@@ -310,28 +330,35 @@ printf("[ustore] put: wrote key %s with data length %u\n", bin_str(key, key_len)
 
 		IndexValue* e = index_find(key, key_len);
 		if (!e) {
-			printf("[ustore] get: key not found in index\n");
+			printf("[ustore] get: key %s not found in index\n", bin_str(key, key_len));
 			return false;
 		}
+printf("[ustore] get: key %s offset %lu\n", bin_str(key, key_len), e->offset);
 
 		if (is_ttl_expired_(e->timestamp, e->ttl)) {
 			index_remove(key, key_len);
-			printf("[ustore] get: key expired by TTL\n");
+			printf("[ustore] get: key %s expired by TTL\n", bin_str(key, key_len));
 			return false;
 		}
 
 		char name[USTORE_MAX_FILENAME_LEN];
-		segment_name(e->segment,name);
+		segment_name(e->segment, name);
 
 		File f = _filesystem.open(name, File::ModeRead);
-		if (!f) return false;
+		if (!f) {
+			printf("[ustore] get: key %s failed to open file %s\n", bin_str(key, key_len), name);
+			return false;
+		}
 
 		f.seek(e->offset, SeekModeSet);
 
 		RecordHeader hdr;
 
-		if (f.read(&hdr, sizeof(hdr)) != sizeof(hdr)) {
-			printf("[ustore] get: header read failed\n");
+		//if (f.read(&hdr, sizeof(hdr)) != sizeof(hdr)) {
+		size_t len = f.read(&hdr, sizeof(hdr));
+printf("[ustore] get: key %s read header of size %u\n", bin_str(key, key_len), len);
+		if (len != sizeof(hdr)) {
+			printf("[ustore] get: key %s header read failed\n", bin_str(key, key_len));
 			f.close();
 			return false;
 		}
@@ -340,7 +367,7 @@ printf("[ustore] put: wrote key %s with data length %u\n", bin_str(key, key_len)
 			hdr.key_len > USTORE_MAX_KEY_LEN ||
 			hdr.length > USTORE_MAX_VALUE_LEN)
 		{
-			printf("[ustore] get: found corrupted record\n");
+			printf("[ustore] get: key %s has corrupted record\n", bin_str(key, key_len));
 			f.close();
 			return false;
 		}
@@ -350,7 +377,7 @@ printf("[ustore] put: wrote key %s with data length %u\n", bin_str(key, key_len)
 			f.seek((long)(e->offset+sizeof(hdr)+hdr.key_len), SeekModeSet);
 			size_t read = std::min(hdr.length, *size);
 			if (f.read(out, read) != read) {
-				printf("[ustore] get: value read failed\n");
+				printf("[ustore] get: key %s value read failed\n", bin_str(key, key_len));
 				f.close();
 				return false;
 			}
@@ -370,6 +397,11 @@ printf("[ustore] get: returning key %s with data length %u\n", bin_str(key, key_
 		return get((const uint8_t*)key, (uint8_t)strlen(key), out, size);
 	}
 
+	inline bool get(const char* key, char* out, uint16_t* size)
+	{
+		return get((const uint8_t*)key, (uint8_t)strlen(key), (uint8_t*)out, size);
+	}
+
 	inline bool get(const std::vector<uint8_t>& key, uint8_t* out, uint16_t* size)
 	{
 		return get(key.data(), (uint8_t)key.size(), out, size);
@@ -377,9 +409,37 @@ printf("[ustore] get: returning key %s with data length %u\n", bin_str(key, key_
 
 	inline bool get(const std::vector<uint8_t>& key, std::vector<uint8_t>& out)
 	{
-		out.resize(USTORE_MAX_VALUE_LEN);
 		uint16_t size = USTORE_MAX_VALUE_LEN;
+		out.resize(size);
 		if (!get(key.data(), (uint8_t)key.size(), out.data(), &size)) {
+			return false;
+		}
+		out.resize(size);
+		return true;
+	}
+
+	inline bool get(const char* key, std::string& out)
+	{
+		uint16_t size = USTORE_MAX_VALUE_LEN;
+		out.resize(size);
+		// C++17 supported
+		//if (!get(key.data(), (uint8_t)key.size(), out.data(), &size)) {
+		// C++14 supported
+		if (!get((const uint8_t*)key, (uint8_t)strlen(key), (uint8_t*)&out[0], &size)) {
+			return false;
+		}
+		out.resize(size);
+		return true;
+	}
+
+	inline bool get(const std::string& key, std::string& out)
+	{
+		uint16_t size = USTORE_MAX_VALUE_LEN;
+		out.resize(size);
+		// C++17 supported
+		//if (!get(key.data(), (uint8_t)key.size(), out.data(), &size)) {
+		// C++14 supported
+		if (!get((const uint8_t*)key.c_str(), (uint8_t)key.length(), (uint8_t*)&out[0], &size)) {
 			return false;
 		}
 		out.resize(size);
@@ -933,6 +993,18 @@ printf("[ustore] Evicted %lu records to policy_max_recs\n", to_evict);
 		index_file = _filesystem.open(name, File::ModeAppend);
 	}
 
+	const char* char_str(const uint8_t* key, size_t len)
+	{
+		static char str[USTORE_MAX_VALUE_LEN+1];
+		int n = 0;
+		for (int i = 0; i < len && i < USTORE_MAX_VALUE_LEN; ++i) {
+			str[n] = key[i];
+			n++;
+		}
+		str[n] = 0;
+		return str;
+	}
+
 	const char* bin_str(const uint8_t* key, size_t len)
 	{
 		static char str[USTORE_MAX_VALUE_LEN*2+1];
@@ -1238,6 +1310,7 @@ printf("[ustore] Opening tmp file: %s\n", tmp_name);
 			v = LiveRecVec(lr_alloc);
 		}
 
+		// CBA TODO: Optimize memory usage required for the following operation
 		for (auto& kv : _index) {
 printf("[ustore] Calling is_ttl_expired_ with ttl: %u, ts: %u, now: %u\n", kv.second.ttl, kv.second.timestamp, microStore::time());
 			if (is_ttl_expired_(kv.second.timestamp, kv.second.ttl)) continue;
@@ -1274,22 +1347,33 @@ printf("[ustore] Pushing segment: %u, offset: %u\n", seg, lr.offset);
 		uint32_t committed_segs = 0;  // number of source segments committed to compact.tmp
 
 		for (uint32_t s = 0; s < _segment_count; s++) {
-			char src_name[USTORE_MAX_FILENAME_LEN]; segment_name(s, src_name);
 printf("[ustore] Processing segment: %u, size: %lu\n", s, per_seg[s].size());
-
+			char src_name[USTORE_MAX_FILENAME_LEN]; segment_name(s, src_name);
 			if (!per_seg[s].empty()) {
 printf("[ustore] Opening src file: %s\n", src_name);
 				File src = _filesystem.open(src_name, File::ModeRead);
 				if (src) {
 					for (size_t i = 0; i < per_seg[s].size(); i++) {
 						LiveRec& lr = per_seg[s][i];
+printf("[ustore] Processing record: %u offset: %lu\n", i, lr.offset);
 						src.seek((long)lr.offset, SeekModeSet);
 						RecordHeader hdr;
-						if (src.read(&hdr, sizeof(hdr)) != sizeof(hdr)) continue;
-						if (hdr.magic != MAGIC_RECORD || hdr.key_len > USTORE_MAX_KEY_LEN ||
-							hdr.length > USTORE_MAX_VALUE_LEN) continue;
-						if (src.read(key_buf, hdr.key_len) != hdr.key_len) continue;
-						if (hdr.length > 0 && src.read(val_buf, hdr.length) != hdr.length) continue;
+						if (src.read(&hdr, sizeof(hdr)) != sizeof(hdr)) {
+printf("[ustore] WARNING: Failed to read record header\n");
+							continue;
+						}
+						if (hdr.magic != MAGIC_RECORD || hdr.key_len > USTORE_MAX_KEY_LEN || hdr.length > USTORE_MAX_VALUE_LEN) {
+printf("[ustore] WARNING: Record magic number incorrect\n");
+							continue;
+						}
+						if (src.read(key_buf, hdr.key_len) != hdr.key_len) {
+printf("[ustore] WARNING: Failed to read record key\n");
+							continue;
+						}
+						if (hdr.length > 0 && src.read(val_buf, hdr.length) != hdr.length) {
+printf("[ustore] WARNING: Failed to read record value\n");
+							continue;
+						}
 						RecordCommit c; c.magic = MAGIC_COMMIT;
 						uint32_t expected = sizeof(hdr) + hdr.key_len + hdr.length + sizeof(c);
 						size_t written = 0;
@@ -1301,6 +1385,9 @@ printf("[ustore] Opening src file: %s\n", src_name);
 					}
 printf("[ustore] Closing src file: %s\n", src_name);
 					src.close();
+				}
+				else {
+					printf("[ustore] ERROR: Failed to open src file: %s\n", src_name);
 				}
 			}
 

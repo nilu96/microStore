@@ -14,7 +14,6 @@
 
 #pragma once
 
-#if defined(USTORE_USE_SD)
 
 #include "../File.h"
 #include "../FileSystem.h"
@@ -259,5 +258,3 @@ protected:
 };
 
 } }
-
-#endif

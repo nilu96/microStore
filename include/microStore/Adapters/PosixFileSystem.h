@@ -14,7 +14,6 @@
 
 #pragma once
 
-#if defined(USTORE_USE_POSIXFS)
 
 #include "../File.h"
 #include "../FileSystem.h"
@@ -371,5 +370,3 @@ protected:
 };
 
 } }
-
-#endif

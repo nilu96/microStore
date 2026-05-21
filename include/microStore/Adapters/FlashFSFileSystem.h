@@ -14,7 +14,6 @@
 
 #pragma once
 
-#if defined(USTORE_USE_FLASHFS)
 
 #include "../File.h"
 #include "../FileSystem.h"
@@ -305,5 +304,3 @@ protected:
 };
 
 } }
-
-#endif

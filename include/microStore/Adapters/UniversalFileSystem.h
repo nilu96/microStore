@@ -14,7 +14,6 @@
 
 #pragma once
 
-#if defined(USTORE_USE_UNIVERSALFS)
 
 #include "../File.h"
 #include "../FileSystem.h"
@@ -38,7 +37,5 @@ using UniversalFileSystem = InternalFSFileSystem;
 namespace microStore { namespace Adapters {
 using UniversalFileSystem = PosixFileSystem;
 } }
-
-#endif
 
 #endif

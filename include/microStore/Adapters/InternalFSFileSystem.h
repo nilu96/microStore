@@ -14,7 +14,6 @@
 
 #pragma once
 
-#if defined(USTORE_USE_INTERNALFS)
 
 #include "../File.h"
 #include "../FileSystem.h"
@@ -313,5 +312,3 @@ protected:
 };
 
 } }
-
-#endif

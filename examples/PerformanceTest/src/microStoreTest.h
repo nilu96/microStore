@@ -1,7 +1,5 @@
 
-#undef abs
-#undef round
-#include <random>
+#include "utility.h"
 
 #include <microStore/FileStore.h>
 #if defined(USTORE_USE_SD)
@@ -44,19 +42,6 @@ microStore::FileSystem filesystem{microStore::Adapters::FlashFSFileSystem(&devic
 microStore::FileSystem filesystem{microStore::Adapters::UniversalFileSystem()};
 #endif
 FileStore store(PATH_TABLE_SEGMENT_SIZE, PATH_TABLE_SEGMENT_COUNT);
-
-
-/* -------------------------------------------------- */
-/* RANDOM UTILITIES                                   */
-/* -------------------------------------------------- */
-
-std::mt19937 rng(microStore::time());
-
-int rand_int(int max)
-{
-    std::uniform_int_distribution<int> d(0,max-1);
-    return d(rng);
-}
 
 void make_key(uint8_t key[16], uint32_t v)
 {
@@ -129,7 +114,7 @@ kvdb_err_t kvdb_init(bool clear = false) {
     if (clear) printf("Initializing store and clearing storage...\n");
     else printf("Initializing store...\n");
     store.set_max_recs(PATH_TABLE_MAX_RECS);
-	if (!store.init(filesystem, "/kvstress", clear)) {
+	if (!store.init(filesystem, "./kvstress", clear)) {
         printf("ERROR: Failed to initialize store\n");
         return KVDB_ERR_INIT;
     }

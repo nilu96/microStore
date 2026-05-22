@@ -674,7 +674,7 @@ void test_file_store_compact_basic() {
 void setUp()    {}
 void tearDown() {}
 
-int main() {
+int runUnityTests(void) {
     UNITY_BEGIN();
     // TTL tests
     RUN_TEST(test_ttl_get_expires_old_record);
@@ -698,4 +698,26 @@ int main() {
     RUN_TEST(test_file_store_ttl_exists_expires);
     RUN_TEST(test_file_store_compact_basic);
     return UNITY_END();
+}
+
+// For native dev-platform or for some embedded frameworks
+int main(void) {
+	return runUnityTests();
+}
+
+#ifdef ARDUINO
+// For Arduino framework
+void setup() {
+	// Wait ~2 seconds before the Unity test runner
+	// establishes connection with a board Serial interface
+	delay(2000);
+
+	runUnityTests();
+}
+void loop() {}
+#endif
+
+// For ESP-IDF framework
+void app_main() {
+	runUnityTests();
 }

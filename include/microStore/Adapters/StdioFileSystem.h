@@ -36,7 +36,7 @@ namespace microStore { namespace Adapters {
 class  StdioFileSystem : public microStore::FileSystem {
 
 public:
-	 StdioFileSystem() : microStore::FileSystem(new  FileSystemImpl()) {}
+	 StdioFileSystem(const char* basepath = "") : microStore::FileSystem(new  FileSystemImpl(basepath)) {}
     virtual ~ StdioFileSystem() {}
 
     // Disable heap allocation
@@ -186,37 +186,37 @@ protected:
 	class FileSystemImpl : public microStore::FileSystemImpl {
 
 	public:
-		FileSystemImpl() {}
+		FileSystemImpl(const char* basepath = "") : _basepath(basepath) {}
 	    virtual ~FileSystemImpl() {}
 
 	public:
 
 		virtual bool format() override {
-	#if defined(ESP32)
+#if defined(ESP32)
 			printf("[ustore] Formatting StdioFileSystem\n");
 			if (!LittleFS.format()) {
 				printf("[ustore] Failed to format StdioFileSystem!\n");
 				return false;
 			}
 			return true;
-	#else
+#else
 			return false;
-	#endif
+#endif
 		}
 
 		inline virtual bool init(bool reformatOnFail = true) override {
 			printf("[ustore] Initializing StdioFileSystem\n");
-	#if defined(ESP32)
+#if defined(ESP32)
 			// Initialize LittleFS for POSIX file access
-			if (!LittleFS.begin(true, "")) {
+			if (!LittleFS.begin(true, _basepath)) {
 				printf("[ustore] Failed to initialize StdioFileSystem!\n");
 				return false;
 			}
-	#endif
+#endif
 			if (reformatOnFail) {
 				// Ensure filesystem is writable and reformat if not
 				bool verified = false;
-				microStore::File init_test = open("/__init_test__", microStore::File::ModeWrite, true);
+				microStore::File init_test = open("./__init_test__", microStore::File::ModeWrite, true);
 				if (init_test) {
 					if (init_test.write("test", 4) == 4) {
 						verified = true;
@@ -224,12 +224,12 @@ protected:
 					init_test.close();
 				}
 				if (!verified) {
-					printf("[ustore] WARNING: FlashFSFileSystem check failed, reformatting!\n");
+					printf("[ustore] WARNING: StdioFileSystem check failed, reformatting!\n");
 					format();
 				}
 				else {
-					remove("/__init_test__");
-					printf("[ustore] FlashFSFileSystem check passed!\n");
+					remove("./__init_test__");
+					printf("[ustore] StdioFileSystem check passed!\n");
 				}
 			}
 			return true;
@@ -344,6 +344,8 @@ protected:
 	#endif
 		}
 
+	private:
+		const char* _basepath = "";
 	};
 
 };

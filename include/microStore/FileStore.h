@@ -144,7 +144,7 @@ public:
 		printf("[ustore] init: Initializing FileStore with prefix=%s, segment_size=%lu, segment_count=%u\n", prefix, _segment_size, _segment_count);
 
 		_filesystem = filesystem;
-		strncpy(base_prefix,prefix,sizeof(base_prefix));
+		strncpy(base_prefix, prefix, sizeof(base_prefix));
 
 		if (clearOnInit) {
 			clear();
@@ -183,21 +183,39 @@ public:
 		return true;
 	}
 
+	void close() {
+		printf("[ustore] close: Closing FileStore\n");
+		flush_buffer();
+		if (index_file) index_file.close();
+		if (active_file) active_file.close();
+	}
+
 	void clear()
 	{
+		printf("[ustore] clear: Clearing FileStore\n");
         if (!isValid()) {
 			printf("[ustore] clear: store is invalid, skipping!\n");
 			return;
 		}
 
+		flush_buffer();
+		bool index_open = false;
+		if (index_file) {
+			index_file.close();
+			index_open = true;
+		}
+		bool active_open = false;
+		if (active_file) {
+			active_file.close();
+			active_open = true;
+		}
+
 		char name[USTORE_MAX_FILENAME_LEN];
-
-		if (index_file) index_file.close();
-
 		for(uint32_t i = 0; i < _segment_count; i++)
 		{
 			segment_name(i,name);
 			//printf("[ustore] clear: removing segment file: %s\n", name);
+//printf("[ustore] Removing file: %s\n", name);
 			_filesystem.remove(name);
 		}
 
@@ -211,8 +229,8 @@ public:
 		current_offset=0;
 		write_buf_pos=0;
 
-		open_index_for_append();
-		open_segment(0);
+		if (index_open) open_index_for_append();
+		if (active_open) open_segment(0);
 	}
 
 	/* -------- PUT -------- */
@@ -221,6 +239,7 @@ public:
 	{
         if (!isValid()) return false;
 
+printf("[ustore] put: storing key %s with data len %u\n", bin_str(key, key_len), len);
 		if (key_len > USTORE_MAX_KEY_LEN) {
 			printf("[ustore] put: failed due to excessive key length: %u\n", key_len);
 			return false;
@@ -277,7 +296,7 @@ public:
 			prune_index_to_max_recs_();
 
 		persist_index_entry(key, key_len, current_segment, offset, ts, ttl);
-printf("[ustore] put: key %s offset %u\n", bin_str(key, key_len), offset);
+//printf("[ustore] put: key %s offset %u\n", bin_str(key, key_len), offset);
 
 		current_offset += sizeof(hdr)+key_len+len+sizeof(c);
 
@@ -820,6 +839,7 @@ private:
 
 	bool flush_buffer()
 	{
+		if (write_buf_pos == 0) return true;
 		if (!active_file) {
 			printf("[ustore] ERROR: Active file is not valid, failed to flush buffer\n");
 			// CBA Must reset buffer pos to avoid an infinite flushing loop
@@ -1045,7 +1065,10 @@ printf("[ustore] Evicted %lu records to policy_max_recs\n", to_evict);
 
 	bool open_segment(uint32_t id)
 	{
-		if (active_file) active_file.close();
+		if (active_file) {
+printf("[ustore] Closing active file\n");
+			active_file.close();
+		}
 
 		char name[USTORE_MAX_FILENAME_LEN];
 		segment_name(id,name);
@@ -1070,7 +1093,10 @@ printf("[ustore] Opening active file: %s\n", name);
 printf("[ustore] Rotating segment...\n");
 		flush_buffer();
 
-		if (active_file) active_file.close();
+		if (active_file) {
+printf("[ustore] Closing active file\n");
+			active_file.close();
+		}
 
 		current_segment++;
 
@@ -1117,7 +1143,8 @@ printf("[ustore] Rotating segment...\n");
 
 	void clear_journal()
 	{
-		char name[USTORE_MAX_FILENAME_LEN]; journal_name(name);
+		char name[USTORE_MAX_FILENAME_LEN];
+		journal_name(name);
 		_filesystem.remove(name);
 	}
 
@@ -1140,7 +1167,8 @@ printf("[ustore] Compaction triggered by deleted threshold\n");
 
 	void recover_if_needed()
 	{
-		char name[USTORE_MAX_FILENAME_LEN]; journal_name(name);
+		char name[USTORE_MAX_FILENAME_LEN];
+		journal_name(name);
 		File f = _filesystem.open(name, File::ModeRead);
 		if (!f) return;
 
@@ -1187,12 +1215,16 @@ printf("[ustore] Compaction triggered by deleted threshold\n");
 
 	void finalize_compaction()
 	{
-		char tmp_name[USTORE_MAX_FILENAME_LEN]; snprintf(tmp_name, sizeof(tmp_name), "%s_compact.tmp", base_prefix);
-		char seg0[USTORE_MAX_FILENAME_LEN];     segment_name(0, seg0);
+		char tmp_name[USTORE_MAX_FILENAME_LEN];
+		snprintf(tmp_name, sizeof(tmp_name), "%s_compact.tmp", base_prefix);
+		char seg0[USTORE_MAX_FILENAME_LEN];
+		segment_name(0, seg0);
 
 		// Remove all existing segments, then rename tmp → seg0.
 		for (uint32_t i = 0; i < _segment_count; i++) {
-			char sname[USTORE_MAX_FILENAME_LEN]; segment_name(i, sname);
+			char sname[USTORE_MAX_FILENAME_LEN];
+			segment_name(i, sname);
+printf("[ustore] Removing file: %s\n", sname);
 			_filesystem.remove(sname);
 		}
 		if (!_filesystem.rename(tmp_name, seg0)) {

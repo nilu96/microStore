@@ -508,7 +508,7 @@ void test_iterator_value_loaded_on_deref() {
 
 /* ---- Main ---- */
 
-int main() {
+int runUnityTests(void) {
     UNITY_BEGIN();
     RUN_TEST(test_iterator_empty_store);
     RUN_TEST(test_iterator_single_record);
@@ -523,4 +523,26 @@ int main() {
     RUN_TEST(test_iterator_value_not_loaded_until_deref);
     RUN_TEST(test_iterator_value_loaded_on_deref);
     return UNITY_END();
+}
+
+// For native dev-platform or for some embedded frameworks
+int main(void) {
+	return runUnityTests();
+}
+
+#ifdef ARDUINO
+// For Arduino framework
+void setup() {
+	// Wait ~2 seconds before the Unity test runner
+	// establishes connection with a board Serial interface
+	delay(2000);
+
+	runUnityTests();
+}
+void loop() {}
+#endif
+
+// For ESP-IDF framework
+void app_main() {
+	runUnityTests();
 }

@@ -345,7 +345,7 @@ void test_heap_store_iterator_traits() {
 
 /* ---- Main ---- */
 
-int main() {
+int runUnityTests(void) {
     UNITY_BEGIN();
     RUN_TEST(test_heap_store_put_get);
     RUN_TEST(test_heap_store_overwrite);
@@ -371,4 +371,26 @@ int main() {
     RUN_TEST(test_heap_store_max_recs_zero_unlimited);
     RUN_TEST(test_heap_store_ttl_and_max_recs);
     return UNITY_END();
+}
+
+// For native dev-platform or for some embedded frameworks
+int main(void) {
+	return runUnityTests();
+}
+
+#ifdef ARDUINO
+// For Arduino framework
+void setup() {
+	// Wait ~2 seconds before the Unity test runner
+	// establishes connection with a board Serial interface
+	delay(2000);
+
+	runUnityTests();
+}
+void loop() {}
+#endif
+
+// For ESP-IDF framework
+void app_main() {
+	runUnityTests();
 }

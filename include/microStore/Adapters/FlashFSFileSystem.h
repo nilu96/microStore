@@ -159,7 +159,7 @@ protected:
 			if (reformatOnFail) {
 				// Ensure filesystem is writable and reformat if not
 				bool verified = false;
-				microStore::File init_test = open("/__init_test__", microStore::File::ModeWrite, true);
+				microStore::File init_test = open("./__init_test__", microStore::File::ModeWrite, true);
 				if (init_test) {
 					if (init_test.write("test", 4) == 4) {
 						verified = true;
@@ -171,7 +171,7 @@ protected:
 					format();
 				}
 				else {
-					remove("/__init_test__");
+					remove("./__init_test__");
 					printf("[ustore] FlashFSFileSystem check passed!\n");
 				}
 			}

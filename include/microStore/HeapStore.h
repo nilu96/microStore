@@ -55,11 +55,16 @@ public:
 	inline operator bool() const { return isValid(); }
 
     bool init(bool clearOnInit = false) {
+		printf("[ustore] init: Initializing HeapStore\n");
 		if (clearOnInit) {
 			clear();
 		}
         return true;
     }
+
+	void close() {
+		printf("[ustore] close: Closing HeapStore\n");
+	}
 
     /* -------- PUT -------- */
 
@@ -218,6 +223,7 @@ public:
     /* -------- CLEAR -------- */
 
     void clear() {
+		printf("[ustore] close: Clearing HeapStore\n");
         if (!isValid()) return;
         data_.clear();
     }
@@ -243,8 +249,8 @@ public:
             total_bytes += kv.first.size() + kv.second.value.size();
 
         printf("HeapStore:\n");
-        printf("  Entries     : %8u\n", (unsigned)data_.size());
-        printf("  Bytes (key+value): %8u\n", (unsigned)total_bytes);
+        printf("  Entries: %8u\n", (unsigned)data_.size());
+        printf("  Bytes:   %8u\n", (unsigned)total_bytes);
         (void)detailed;
     }
 

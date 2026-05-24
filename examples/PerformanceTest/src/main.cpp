@@ -42,6 +42,7 @@
 #include <Arduino.h>
 #endif
 
+#include "utility.h"
 #include "microStoreTest.h"
 
 /* ── Clear-on-boot option ───────────────────────────────────────────────────
@@ -151,7 +152,7 @@ static void stress_del()
     if (st_count == 0) return;
 
     /* Pick a random victim from the live pool */
-    uint16_t slot = (uint16_t)(random((long)st_count));
+    uint16_t slot = (uint16_t)(rand_int((int)st_count));
     char key[20];
     uint32_t id = st_ids[slot];
     snprintf(key, sizeof(key), "s_%lu", id);
@@ -183,7 +184,7 @@ static void stress_get()
 
     /* Pick a random ID from the full [0, st_next_id) range.
      * ~50% of these will have been deleted, producing the expected miss rate. */
-    uint32_t id = (uint32_t)(random((long)st_next_id));
+    uint32_t id = (uint32_t)(rand_long((long)st_next_id));
     char key[20];
     snprintf(key, sizeof(key), "s_%lu", id);
 
@@ -294,7 +295,11 @@ void setup()
     if (kvdb_init() != KVDB_OK) {
 #endif
         printf("[main] ERROR: KVDB init failed — halting.\n");
+#ifdef ARDUINO
         while (true) delay(1000);
+#else
+        exit(1);
+#endif
     }
     printf("[main] KVDB ready.\n");
 
@@ -345,10 +350,7 @@ void setup()
     printf("\n");
     kvdb_dump();
 
-    /* ── 6. Seed PRNG for stress-test random deletions ────────────────────*/
-    randomSeed((uint32_t)micros() ^ boot_cnt);
-
-    /* ── 7. Clean up stress records left on flash from the previous run ───
+    /* ── 6. Clean up stress records left on flash from the previous run ───
      *
      * Deleted KV entries are not immediately reclaimed; they remain as
      * physical garbage until FlashDB's GC collects them.  Records from a

@@ -25,7 +25,7 @@ namespace microStore { namespace Adapters {
 class LittleFSFileSystem : public microStore::FileSystem {
 
 public:
-	LittleFSFileSystem() : microStore::FileSystem(new FileSystemImpl()) {}
+	LittleFSFileSystem(const char* basepath = "") : microStore::FileSystem(new FileSystemImpl(basepath)) {}
     virtual ~LittleFSFileSystem() {}
 
     // Disable heap allocation
@@ -83,7 +83,7 @@ protected:
 	class FileSystemImpl : public microStore::FileSystemImpl {
 
 	public:
-		FileSystemImpl() {}
+		FileSystemImpl(const char* basepath = "") : _basepath(basepath) {}
 	    virtual ~FileSystemImpl() {}
 
 	public:
@@ -100,14 +100,14 @@ protected:
 		inline virtual bool init(bool reformatOnFail = true) override {
 			printf("[ustore] Initializing LittleFSFileSystem\n");
 			// Initialize LittleFS
-			if (!LittleFS.begin(true, "")) {
+			if (!LittleFS.begin(true, _basepath)) {
 				printf("[ustore] Failed to initialize LittleFSFileSystem!\n");
 				return false;
 			}
 			if (reformatOnFail) {
 				// Ensure filesystem is writable and reformat if not
 				bool verified = false;
-				microStore::File init_test = open("/__init_test__", microStore::File::ModeWrite, true);
+				microStore::File init_test = open("./__init_test__", microStore::File::ModeWrite, true);
 				if (init_test) {
 					if (init_test.write("test", 4) == 4) {
 						verified = true;
@@ -115,12 +115,12 @@ protected:
 					init_test.close();
 				}
 				if (!verified) {
-					printf("[ustore] WARNING: FlashFSFileSystem check failed, reformatting!\n");
+					printf("[ustore] WARNING: LittleFSFileSystem check failed, reformatting!\n");
 					format();
 				}
 				else {
-					remove("/__init_test__");
-					printf("[ustore] FlashFSFileSystem check passed!\n");
+					remove("./__init_test__");
+					printf("[ustore] LittleFSFileSystem check passed!\n");
 				}
 			}
 			return true;
@@ -225,6 +225,8 @@ protected:
 			return (LittleFS.totalBytes() - LittleFS.usedBytes());
 		}
 
+	private:
+		const char* _basepath = "";
 	};
 
 };

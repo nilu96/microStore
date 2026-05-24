@@ -95,7 +95,7 @@ public:
             return it_ != other.it_;
         }
 
-        Entry operator*()
+        Entry& operator*()
         {
             return current_;
         }

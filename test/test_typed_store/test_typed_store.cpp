@@ -399,7 +399,7 @@ void test_typed_store_custom_int_codec() {
 void setUp()    {}
 void tearDown() {}
 
-int main() {
+int runUnityTests(void) {
     UNITY_BEGIN();
     RUN_TEST(test_typed_store_put_get);
     RUN_TEST(test_typed_store_overwrite);
@@ -410,4 +410,26 @@ int main() {
     RUN_TEST(test_typed_store_vector_value);
     RUN_TEST(test_typed_store_custom_int_codec);
     return UNITY_END();
+}
+
+// For native dev-platform or for some embedded frameworks
+int main(void) {
+	return runUnityTests();
+}
+
+#ifdef ARDUINO
+// For Arduino framework
+void setup() {
+	// Wait ~2 seconds before the Unity test runner
+	// establishes connection with a board Serial interface
+	delay(2000);
+
+	runUnityTests();
+}
+void loop() {}
+#endif
+
+// For ESP-IDF framework
+void app_main() {
+	runUnityTests();
 }

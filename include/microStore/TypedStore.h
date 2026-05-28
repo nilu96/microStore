@@ -67,7 +67,7 @@ public:
         return store.exists(k);
     }
 
-    size_t size()
+    size_t size() const
     {
         if (!isValid()) return 0;
         return store.size();

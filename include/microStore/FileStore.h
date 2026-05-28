@@ -544,7 +544,7 @@ printf("[ustore] get: returning key %s with data length %u\n", bin_str(key, key_
 
 	/* -------- SIZE -------- */
 
-	inline size_t size()
+	inline size_t size() const
 	{
         if (!isValid()) return 0;
 		return _index.size();
@@ -1021,7 +1021,7 @@ printf("[ustore] Evicted %lu records to policy_max_recs\n", to_evict);
 	{
 		static char str[USTORE_MAX_VALUE_LEN+1];
 		int n = 0;
-		for (int i = 0; i < len && i < USTORE_MAX_VALUE_LEN; ++i) {
+		for (size_t i = 0; i < len && i < USTORE_MAX_VALUE_LEN; ++i) {
 			str[n] = key[i];
 			n++;
 		}
@@ -1033,7 +1033,7 @@ printf("[ustore] Evicted %lu records to policy_max_recs\n", to_evict);
 	{
 		static char str[USTORE_MAX_VALUE_LEN*2+1];
 		int n = 0;
-		for (int i = 0; i < len && i < USTORE_MAX_VALUE_LEN; ++i) {
+		for (size_t i = 0; i < len && i < USTORE_MAX_VALUE_LEN; ++i) {
 			//if (key[i] > 31 && key[i] < 127) {
 			//	str[n++] = key[i];
 			//}

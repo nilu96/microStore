@@ -514,8 +514,10 @@ protected:
             size_t allocated_blocks = 0;
             
             // lfs_fs_traverse visits every block currently allocated by the filesystem
+            _extFS._lockFS();
             int err = lfs_traverse(lfs_ptr, littlefsCountBlocks, &allocated_blocks);
-            
+            _extFS._unlockFS();
+
             if (err < 0) {
                 printf("[ustore] Error getting LFS size via traversal: %d\n", err);
                 return 0; 

@@ -62,26 +62,20 @@ protected:
         inline virtual size_t tell() override { return _file->position(); }
         
         inline virtual long seek(uint32_t pos, microStore::SeekMode mode) override {
-            uint32_t targetPos = pos;
-            
-            switch (mode) {
-                case microStore::SeekMode::SeekModeCur:
-                    targetPos = _file->position() + pos;
-                    break;
-                case microStore::SeekMode::SeekModeEnd:
-                    // In case the caller passes a bit-casted negative offset, 
-                    // int32_t cast ensures we subtract from the end size properly.
-                    targetPos = _file->size() + (int32_t)pos; 
-                    break;
-                case microStore::SeekMode::SeekModeSet:
-                default:
-                    targetPos = pos;
-                    break;
-            }
-            
-            // Adafruit's seek returns a bool. The ESP32 adapter implicitly 
-            // returned 1 (true) or 0 (false) cast to long. 
-            return _file->seek(targetPos) ? 1 : 0;
+            uint8_t smode;
+			switch (mode) {
+				case microStore::SeekMode::SeekModeCur:
+					smode = Adafruit_LittleFS_Namespace::SEEK_O_CUR;
+					break;
+				case microStore::SeekMode::SeekModeEnd:
+					smode = Adafruit_LittleFS_Namespace::SEEK_O_END;
+					break;
+				case microStore::SeekMode::SeekModeSet:
+				default:
+					smode = Adafruit_LittleFS_Namespace::SEEK_O_SET;
+					break;
+			}
+			return _file->seek(pos, smode);
         }
         
         inline virtual void flush() override { _file->flush(); }

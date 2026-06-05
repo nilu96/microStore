@@ -127,8 +127,45 @@ protected:
 	class FileSystemImpl : public microStore::FileSystemImpl {
 
 	public:
-		FileSystemImpl(const SPIFlash_Device_t* device, uint8_t ss = SS) : _device(device), _transport(ss, SPI), _flash(&_transport) {}
-	    virtual ~FileSystemImpl() {}
+		#if defined(EXTERNAL_FLASH_USE_QSPI)
+		FileSystemImpl(const SPIFlash_Device_t* device, uint8_t ss = SS) :
+			_device(device),
+			_transportPtr(new (&_transport.qspi) Adafruit_FlashTransport_QSPI()),
+			_flash(_transportPtr) {
+				// This is a hack to work around the fact that Adafruit_FlashTransport_QSPI doesn't configure the pins for QSPI mode
+				// which causes issues on some platforms (nrf52).
+				#if PLATFORM == PLATFORM_NRF52
+				nrf_gpio_cfg(
+					qspiPin(PIN_QSPI_SCK), 
+					NRF_GPIO_PIN_DIR_OUTPUT, 
+					NRF_GPIO_PIN_INPUT_DISCONNECT, 
+					NRF_GPIO_PIN_NOPULL, 
+					NRF_GPIO_PIN_H0H1,  // High Drive
+					NRF_GPIO_PIN_NOSENSE
+				);
+
+				nrf_gpio_cfg(
+					qspiPin(PIN_QSPI_CS), 
+					NRF_GPIO_PIN_DIR_OUTPUT, 
+					NRF_GPIO_PIN_INPUT_DISCONNECT, 
+					NRF_GPIO_PIN_NOPULL, 
+					NRF_GPIO_PIN_H0H1,  // High Drive
+					NRF_GPIO_PIN_NOSENSE
+				);
+				#endif
+			}
+		virtual ~FileSystemImpl() {
+			_transport.qspi.~Adafruit_FlashTransport_QSPI();
+		}
+		#else
+		FileSystemImpl(const SPIFlash_Device_t* device, uint8_t ss = SS) :
+			_device(device),
+			_transportPtr(new (&_transport.spi) Adafruit_FlashTransport_SPI(ss, SPI)),
+			_flash(_transportPtr) {}
+	    virtual ~FileSystemImpl() {
+			_transport.qspi.~Adafruit_FlashTransport_SPI();
+		}
+		#endif
 
 	public:
 
@@ -144,10 +181,6 @@ protected:
 		virtual bool init(bool reformatOnFail = true) override {
 			printf("[ustore] Initializing FlashFSFileSystem\n");
 			// Initialize FlashFSFileSystem
-			if (!_device) {
-				printf("[ustore] No flash device specified for FlashFSFileSystem!\n");
-				return false;
-			}
 			if (!_flash.begin(_device)) {
 				printf("[ustore] ERROR: Failed to initialize device for FlashFSFileSystem!\n");
 				return false;
@@ -296,8 +329,21 @@ protected:
 		}
 
 	private:
+		union TransportStorage {
+			TransportStorage() {}
+			~TransportStorage() {}
+
+			Adafruit_FlashTransport_SPI spi;
+			Adafruit_FlashTransport_QSPI qspi;
+		};
+
+		inline uint8_t qspiPin(uint8_t arduinoPin) {
+			return static_cast<uint8_t>(digitalPinToPinName(arduinoPin));
+		}
+
 		const SPIFlash_Device_t* _device = nullptr;
-		Adafruit_FlashTransport_SPI _transport;
+		TransportStorage _transport;
+		Adafruit_FlashTransport* _transportPtr = nullptr;
 		Cached_SPIFlash _flash;
 	};
 

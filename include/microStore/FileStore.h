@@ -237,7 +237,10 @@ public:
 
 	bool put(const uint8_t* key, uint8_t key_len, const uint8_t* data, uint16_t len, uint32_t ttl = 0, uint32_t ts = microStore::time())
 	{
-        if (!isValid()) return false;
+        if (!isValid()) {
+			printf("[ustore] put: store is invalid\n");
+			return false;
+		}
 
 printf("[ustore] put: storing key %s with data len %u\n", bin_str(key, key_len), len);
 		if (key_len > USTORE_MAX_KEY_LEN) {
@@ -341,7 +344,10 @@ printf("[ustore] put: wrote key %s with data length %u\n", bin_str(key, key_len)
 
 	bool get(const uint8_t* key, uint8_t key_len, uint8_t* out, uint16_t* size)
 	{
-        if (!isValid()) return false;
+        if (!isValid()) {
+			printf("[ustore] get: store is invalid\n");
+			return false;
+		}
 
 printf("[ustore] get: fetching key %s with data size %u\n", bin_str(key, key_len), *size);
 		if (key_len > USTORE_MAX_KEY_LEN) {
@@ -473,7 +479,10 @@ printf("[ustore] get: returning key %s with data length %u\n", bin_str(key, key_
 
 	bool remove(const uint8_t* key, uint8_t key_len)
 	{
-        if (!isValid()) return false;
+        if (!isValid()) {
+			printf("[ustore] remove: store is invalid\n");
+			return false;
+		}
 
 		if(key_len > USTORE_MAX_KEY_LEN) return false;
 
@@ -524,7 +533,10 @@ printf("[ustore] get: returning key %s with data length %u\n", bin_str(key, key_
 
 	bool exists(const uint8_t* key, uint8_t key_len)
 	{
-        if (!isValid()) return false;
+        if (!isValid()){
+			printf("[ustore] exists: store is invalid\n");
+			return false;
+		}
 		if(key_len > USTORE_MAX_KEY_LEN) return false;
 		IndexValue* e = index_find(key, key_len);
 		if (!e) return false;
@@ -546,7 +558,10 @@ printf("[ustore] get: returning key %s with data length %u\n", bin_str(key, key_
 
 	inline size_t size() const
 	{
-        if (!isValid()) return 0;
+        if (!isValid()) {
+			printf("[ustore] size: store is invalid\n");
+			return 0;
+		}
 		return _index.size();
 	}
 

@@ -38,7 +38,10 @@ public:
 
     bool put(const Key& key, const Value& value, uint32_t ttl = 0)
     {
-        if (!isValid()) return false;
+        if (!isValid()) {
+			printf("[ustore] put: store is invalid\n");
+			return false;
+		}
         auto k = KeyCodec::encode(key);
         auto v = ValueCodec::encode(value);
         return store.put(k, v, ttl);
@@ -46,7 +49,10 @@ public:
 
     bool get(const Key& key, Value& value)
     {
-        if (!isValid()) return false;
+        if (!isValid()) {
+			printf("[ustore] get: store is invalid\n");
+			return false;
+		}
         auto k = KeyCodec::encode(key);
         std::vector<uint8_t> raw;
         if (!store.get(k, raw)) return false;
@@ -55,21 +61,30 @@ public:
 
     bool remove(const Key& key)
     {
-        if (!isValid()) return false;
+        if (!isValid()) {
+			printf("[ustore] remove: store is invalid\n");
+			return false;
+		}
         auto k = KeyCodec::encode(key);
         return store.remove(k);
     }
 
     bool exists(const Key& key)
     {
-        if (!isValid()) return false;
+        if (!isValid()) {
+			printf("[ustore] exists: store is invalid\n");
+			return false;
+		}
         auto k = KeyCodec::encode(key);
         return store.exists(k);
     }
 
     size_t size() const
     {
-        if (!isValid()) return 0;
+        if (!isValid()) {
+			printf("[ustore] size: store is invalid\n");
+			return 0;
+		}
         return store.size();
     }
 

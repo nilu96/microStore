@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  */
 
+// Only include if building locally and NOT testing
+#if defined(LIBRARY_TEST) && !defined(PIO_UNIT_TESTING)
+#include <stdio.h>
+
 #if defined(ARDUINO)
 #include <Arduino.h>
 #if defined(ARDUINO_ARCH_NRF52) || defined(ARDUINO_NRF52_ADAFRUIT)
@@ -191,4 +195,6 @@ int main(void) {
 	//}
 	return 0;
 }
+#endif
+
 #endif

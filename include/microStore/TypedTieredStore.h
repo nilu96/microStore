@@ -201,7 +201,7 @@ public:
 		prune_expired_l1_();
 
 		bool ok = true;
-		for (uint16_t i = 0; i < USTORE_L1_CACHE_SIZE; i++) {
+		for (uint16_t i = USTORE_L1_CACHE_SIZE; i-- > 0;) {
 			if (!slots_[i].valid || !slots_[i].dirty) continue;
 			if (slots_[i].in_l2 && !l2_exists_(slots_[i])) {
 				remove_l1_slot_(i);

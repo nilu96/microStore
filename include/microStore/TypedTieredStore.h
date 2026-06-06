@@ -71,7 +71,7 @@ public:
 	inline bool isValid() const { return store.isValid(); }
 	inline operator bool() const { return isValid(); }
 
-	bool put(const Key& key, const Value& value, uint32_t ttl = 0)
+	bool put(const Key& key, const Value& value, uint32_t ttl, uint8_t priority)
 	{
 		if (!isValid()) return false;
 		prune_expired_l1_();
@@ -82,8 +82,8 @@ public:
 		if (l1 >= 0) {
 			Slot& s = slots_[l1];
 			s.value = value;
-			s.timestamp = microStore::time();
-			s.ttl = ttl;
+			s.expires_at = expires_at_(ttl);
+			s.priority = priority;
 			s.dirty = true;
 			touch_l1_((uint16_t)l1);
 			return true;
@@ -95,8 +95,8 @@ public:
 		Slot& s = slots_[(uint16_t)slot];
 		s.key = key;
 		s.value = value;
-		s.timestamp = microStore::time();
-		s.ttl = ttl;
+		s.expires_at = expires_at_(ttl);
+		s.priority = priority;
 		s.dirty = true;
 		s.valid = true;
 		s.in_l2 = store.exists(raw_key);
@@ -133,8 +133,6 @@ public:
 			Slot& s = slots_[(uint16_t)slot];
 			s.key = key;
 			s.value = decoded;
-			s.timestamp = 0;
-			s.ttl = 0;
 			s.dirty = false;
 			s.valid = true;
 			s.in_l2 = true;
@@ -205,6 +203,10 @@ public:
 		bool ok = true;
 		for (uint16_t i = 0; i < USTORE_L1_CACHE_SIZE; i++) {
 			if (!slots_[i].valid || !slots_[i].dirty) continue;
+			if (slots_[i].in_l2 && !l2_exists_(slots_[i])) {
+				remove_l1_slot_(i);
+				continue;
+			}
 			if (!flush_l1_slot_(i))
 				ok = false;
 		}
@@ -354,8 +356,8 @@ private:
 	{
 		Key key;
 		Value value;
-		uint32_t timestamp;
-		uint32_t ttl;
+		uint32_t expires_at = 0;
+		uint8_t priority = 0;
 		uint16_t prev = INVALID;
 		uint16_t next = INVALID;
 		uint16_t hash_next = INVALID;
@@ -380,17 +382,28 @@ private:
 		return key_hash_(key);
 	}
 
+	uint32_t expires_at_(uint32_t ttl) const
+	{
+		if (ttl == 0) return 0;
+		return microStore::time() + ttl;
+	}
+
 	bool is_expired_(const Slot& s) const
 	{
-		return s.ttl != 0 && microStore::time() > s.timestamp && (microStore::time() - s.timestamp) >= s.ttl;
+		return s.expires_at != 0 && microStore::time() >= s.expires_at;
 	}
 
 	uint32_t remaining_ttl_(const Slot& s) const
 	{
-		if (s.ttl == 0) return 0;
+		if (s.expires_at == 0) return 0;
 		uint32_t now = microStore::time();
-		uint32_t elapsed = (now > s.timestamp) ? (now - s.timestamp) : 0;
-		return (elapsed < s.ttl) ? (s.ttl - elapsed) : 1;
+		return (s.expires_at > now) ? (s.expires_at - now) : 1;
+	}
+
+	bool l2_exists_(const Slot& s)
+	{
+		auto raw_key = KeyCodec::encode(s.key);
+		return store.exists(raw_key);
 	}
 
 	uint16_t l1_bucket_(const Key& key) const
@@ -499,7 +512,7 @@ private:
 
 		auto raw_key = KeyCodec::encode(s.key);
 		auto raw_value = ValueCodec::encode(s.value);
-		if (!store.put(raw_key, raw_value, remaining_ttl_(s)))
+		if (!store.put(raw_key, raw_value, remaining_ttl_(s), microStore::time(), s.priority))
 			return false;
 
 		s.dirty = false;

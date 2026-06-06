@@ -21,13 +21,14 @@ public:
     void close() { heap.close(); }
     void clear() { heap.clear(); put_count = 0; remove_count = 0; }
 
-    bool put(const uint8_t* key, uint8_t key_len, const void* data, uint16_t len, uint32_t ttl = 0, uint32_t ts = microStore::time()) {
+    bool put(const uint8_t* key, uint8_t key_len, const void* data, uint16_t len, uint32_t ttl = 0, uint32_t ts = microStore::time(), uint8_t priority = 0) {
         put_count++;
         last_ttl = ttl;
+        last_priority = priority;
         return heap.put(key, key_len, data, len, ttl, ts);
     }
-    bool put(const std::vector<uint8_t>& key, const std::vector<uint8_t>& data, uint32_t ttl = 0, uint32_t ts = microStore::time()) {
-        return put(key.data(), (uint8_t)key.size(), data.data(), (uint16_t)data.size(), ttl, ts);
+    bool put(const std::vector<uint8_t>& key, const std::vector<uint8_t>& data, uint32_t ttl = 0, uint32_t ts = microStore::time(), uint8_t priority = 0) {
+        return put(key.data(), (uint8_t)key.size(), data.data(), (uint16_t)data.size(), ttl, ts, priority);
     }
 
     bool get(const uint8_t* key, uint8_t key_len, void* out, uint16_t* size) {
@@ -57,6 +58,7 @@ public:
     int put_count = 0;
     int remove_count = 0;
     uint32_t last_ttl = 0;
+    uint8_t last_priority = 0;
     microStore::HeapStore heap;
 };
 
@@ -77,7 +79,7 @@ void test_typed_tiered_store_defers_put_until_sync() {
     l2.init();
     StringTieredStore store(l2);
 
-    TEST_ASSERT_TRUE(store.put("a", "one"));
+    TEST_ASSERT_TRUE(store.put("a", "one", 0, 0));
     TEST_ASSERT_EQUAL(0, l2.put_count);
     TEST_ASSERT_FALSE(l2.exists(bytes("a")));
     TEST_ASSERT_EQUAL(1u, store.dirtyCount());
@@ -100,13 +102,13 @@ void test_typed_tiered_store_evicts_lru_dirty_tail() {
     for (int i = 0; i < USTORE_L1_CACHE_SIZE; i++) {
         char key[8];
         snprintf(key, sizeof(key), "k%d", i);
-        TEST_ASSERT_TRUE(store.put(key, "v"));
+        TEST_ASSERT_TRUE(store.put(key, "v", 0, 0));
     }
 
     std::string out;
     TEST_ASSERT_TRUE(store.get("k0", out)); // k0 becomes MRU, k1 is now older than the rest.
 
-    TEST_ASSERT_TRUE(store.put("new", "n"));
+    TEST_ASSERT_TRUE(store.put("new", "n", 0, 0));
     TEST_ASSERT_EQUAL(1, l2.put_count);
     TEST_ASSERT_TRUE(l2.exists(bytes("k1")));
     TEST_ASSERT_FALSE(l2.exists(bytes("k0")));
@@ -119,9 +121,9 @@ void test_typed_tiered_store_sync_flushes_all_dirty_entries() {
     l2.init();
     StringTieredStore store(l2);
 
-    store.put("a", "1");
-    store.put("b", "2");
-    store.put("c", "3");
+    store.put("a", "1", 0, 0);
+    store.put("b", "2", 0, 0);
+    store.put("c", "3", 0, 0);
 
     TEST_ASSERT_EQUAL(0, l2.put_count);
     TEST_ASSERT_TRUE(store.sync());
@@ -137,10 +139,20 @@ void test_typed_tiered_store_flushes_remaining_ttl() {
     l2.init();
     StringTieredStore store(l2);
 
-    TEST_ASSERT_TRUE(store.put("ttl", "value", 120));
+    TEST_ASSERT_TRUE(store.put("ttl", "value", 120, 0));
     TEST_ASSERT_TRUE(store.sync());
     TEST_ASSERT_GREATER_THAN(0u, l2.last_ttl);
     TEST_ASSERT_LESS_OR_EQUAL(120u, l2.last_ttl);
+}
+
+void test_typed_tiered_store_flushes_priority() {
+    CountingStore l2;
+    l2.init();
+    StringTieredStore store(l2);
+
+    TEST_ASSERT_TRUE(store.put("prio", "value", 0, 7));
+    TEST_ASSERT_TRUE(store.sync());
+    TEST_ASSERT_EQUAL_UINT8(7, l2.last_priority);
 }
 
 void test_typed_tiered_store_uses_l2_store_for_existing_keys() {
@@ -189,7 +201,7 @@ void test_typed_tiered_store_clean_l2_entry_remains_visible_after_eviction() {
     for (int i = 0; i < USTORE_L1_CACHE_SIZE; i++) {
         char key[8];
         snprintf(key, sizeof(key), "n%d", i);
-        TEST_ASSERT_TRUE(store.put(key, "v"));
+        TEST_ASSERT_TRUE(store.put(key, "v", 0, 0));
     }
 
     TEST_ASSERT_TRUE(store.exists("flash"));
@@ -203,7 +215,7 @@ void test_typed_tiered_store_overwrite_existing_l2_record() {
     l2.put_count = 0;
 
     StringTieredStore store(l2);
-    TEST_ASSERT_TRUE(store.put("a", "new"));
+    TEST_ASSERT_TRUE(store.put("a", "new", 0, 0));
     TEST_ASSERT_EQUAL(1u, store.size());
     TEST_ASSERT_EQUAL_STRING("old", read_l2_string(l2, "a").c_str());
 
@@ -213,14 +225,36 @@ void test_typed_tiered_store_overwrite_existing_l2_record() {
     TEST_ASSERT_EQUAL(1u, store.size());
 }
 
+void test_typed_tiered_store_sync_drops_dirty_entry_pruned_from_l2() {
+    CountingStore l2;
+    l2.init();
+    l2.put(bytes("gone"), bytes("old"));
+    l2.put_count = 0;
+
+    StringTieredStore store(l2);
+    std::string out;
+    TEST_ASSERT_TRUE(store.get("gone", out));
+    TEST_ASSERT_TRUE(store.put("gone", "new", 0, 0));
+    TEST_ASSERT_EQUAL(1u, store.dirtyCount());
+
+    TEST_ASSERT_TRUE(l2.remove(bytes("gone")));
+    l2.put_count = 0;
+
+    TEST_ASSERT_TRUE(store.sync());
+    TEST_ASSERT_EQUAL(0, l2.put_count);
+    TEST_ASSERT_FALSE(l2.exists(bytes("gone")));
+    TEST_ASSERT_EQUAL(0u, store.dirtyCount());
+    TEST_ASSERT_FALSE(store.exists("gone"));
+}
+
 void test_typed_tiered_store_remove_clears_l1_and_l2() {
     CountingStore l2;
     l2.init();
     StringTieredStore store(l2);
 
-    store.put("a", "old");
+    store.put("a", "old", 0, 0);
     store.sync();
-    store.put("a", "new");
+    store.put("a", "new", 0, 0);
 
     TEST_ASSERT_TRUE(store.remove("a"));
     TEST_ASSERT_FALSE(store.exists("a"));
@@ -236,8 +270,8 @@ void test_typed_tiered_store_iterator_merges_l1_and_l2() {
     l2.put_count = 0;
 
     StringTieredStore store(l2);
-    store.put("ram", "R");
-    store.put("flash", "updated");
+    store.put("ram", "R", 0, 0);
+    store.put("flash", "updated", 0, 0);
 
     std::map<std::string, std::string> seen;
     for (auto& e : store) {
@@ -256,10 +290,12 @@ int runUnityTests(void) {
     RUN_TEST(test_typed_tiered_store_evicts_lru_dirty_tail);
     RUN_TEST(test_typed_tiered_store_sync_flushes_all_dirty_entries);
     RUN_TEST(test_typed_tiered_store_flushes_remaining_ttl);
+    RUN_TEST(test_typed_tiered_store_flushes_priority);
     RUN_TEST(test_typed_tiered_store_uses_l2_store_for_existing_keys);
     RUN_TEST(test_typed_tiered_store_promoted_l2_entry_is_not_double_counted);
     RUN_TEST(test_typed_tiered_store_clean_l2_entry_remains_visible_after_eviction);
     RUN_TEST(test_typed_tiered_store_overwrite_existing_l2_record);
+    RUN_TEST(test_typed_tiered_store_sync_drops_dirty_entry_pruned_from_l2);
     RUN_TEST(test_typed_tiered_store_remove_clears_l1_and_l2);
     RUN_TEST(test_typed_tiered_store_iterator_merges_l1_and_l2);
     return UNITY_END();

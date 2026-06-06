@@ -182,10 +182,10 @@ public:
 		return store.exists(raw_key);
 	}
 
-	size_t size()
+	size_t size() const
 	{
 		if (!isValid()) return 0;
-		prune_expired_l1_();
+		//prune_expired_l1_();
 
 		size_t n = store.size();
 		for (uint16_t i = 0; i < USTORE_L1_CACHE_SIZE; i++) {

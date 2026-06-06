@@ -335,6 +335,53 @@ void test_max_recs_init_prunes_oldest() {
     TEST_ASSERT_TRUE(reader.exists("k3"));
 }
 
+// Higher priority values add a TTL-scaled timestamp penalty using the effective
+// TTL. With policy ttl=60, priority 3 is protected enough to survive over a
+// priority-2 record that is 50 seconds newer.
+void test_max_recs_init_uses_priority_ttl_penalty() {
+    reset_ram_fs();
+    uint32_t now = microStore::time();
+    uint32_t ttl = 100000;
+
+   {
+        reset_ram_fs();
+        microStore::FileStore writer;
+        auto fs = make_ram_fs();
+        writer.init(fs, "/p");
+        writer.put("prio2_old", "v1", ttl, now, /*priority=*/2);
+        writer.put("prio3_newer", "v2", ttl, now + ttl / 2, /*priority=*/3);
+        remove_ram_file("/p_index.dat");
+
+        microStore::FileStore reader;
+        auto reader_fs = make_ram_fs();
+        reader.set_max_recs(1);
+        reader.init(reader_fs, "/p");
+
+        TEST_ASSERT_EQUAL(1u, reader.size());
+        TEST_ASSERT_TRUE(reader.exists("prio2_old"));
+        TEST_ASSERT_FALSE(reader.exists("prio3_newer"));
+    }
+
+    {
+        reset_ram_fs();
+        microStore::FileStore writer;
+        auto fs = make_ram_fs();
+        writer.init(fs, "/p");
+        writer.put("prio3_old", "v1", ttl, now, /*priority=*/3);
+        writer.put("prio4_newer", "v2", ttl, now + ttl + 1, /*priority=*/4);
+        remove_ram_file("/p_index.dat");
+
+        microStore::FileStore reader;
+        auto reader_fs = make_ram_fs();
+        reader.set_max_recs(1);
+        reader.init(reader_fs, "/p");
+
+        TEST_ASSERT_EQUAL(1u, reader.size());
+        TEST_ASSERT_FALSE(reader.exists("prio3_old"));
+        TEST_ASSERT_TRUE(reader.exists("prio4_newer"));
+    }
+}
+
 // The persistent index written after pruning should not re-introduce the evicted
 // key on a subsequent reload (without a compaction).
 void test_max_recs_pruned_index_persists_across_reboot() {
@@ -682,6 +729,7 @@ int runUnityTests(void) {
     RUN_TEST(test_ttl_compact_removes_expired);
     // Max-records tests
     RUN_TEST(test_max_recs_init_prunes_oldest);
+    RUN_TEST(test_max_recs_init_uses_priority_ttl_penalty);
     RUN_TEST(test_max_recs_pruned_index_persists_across_reboot);
     RUN_TEST(test_max_recs_compact_prunes_oldest);
     // Basic CRUD (ported from test_heap_store)

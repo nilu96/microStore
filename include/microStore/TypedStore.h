@@ -17,6 +17,7 @@
 #include "Codec.h"
 
 #include <vector>
+#include "Utility.h"
 
 namespace microStore {
 
@@ -36,7 +37,7 @@ public:
 	inline bool isValid() const { return store.isValid(); }
 	inline operator bool() const { return isValid(); }
 
-    bool put(const Key& key, const Value& value, uint32_t ttl = 0)
+    bool put(const Key& key, const Value& value, uint32_t ttl = 0, uint8_t priority = 0)
     {
         if (!isValid()) {
 			printf("[ustore] put: store is invalid\n");
@@ -44,7 +45,7 @@ public:
 		}
         auto k = KeyCodec::encode(key);
         auto v = ValueCodec::encode(value);
-        return store.put(k, v, ttl);
+        return store.put(k, v, ttl, microStore::time(), priority);
     }
 
     bool get(const Key& key, Value& value)

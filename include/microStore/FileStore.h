@@ -103,6 +103,7 @@ struct RecordHeader
 	uint16_t length;      // lenght of the value
 	uint32_t timestamp;   // timestamp at record insertion
 	uint32_t ttl;         // per-record TTL in seconds; 0 = use global policy
+	uint8_t priority;     // record priority for eviction
 	uint32_t crc;         // integrity check — MUST be last
 };
 
@@ -235,14 +236,14 @@ public:
 
 	/* -------- PUT -------- */
 
-	bool put(const uint8_t* key, uint8_t key_len, const uint8_t* data, uint16_t len, uint32_t ttl = 0, uint32_t ts = microStore::time())
+	bool put(const uint8_t* key, uint8_t key_len, const uint8_t* data, uint16_t len, uint32_t ttl = 0, uint32_t ts = microStore::time(), uint8_t priority = 0)
 	{
         if (!isValid()) {
 			printf("[ustore] put: store is invalid\n");
 			return false;
 		}
 
-printf("[ustore] put: storing key %s with data len %u\n", bin_str(key, key_len), len);
+printf("[ustore] put: storing key %s with priority %u and data len %u\n", bin_str(key, key_len), priority, len);
 		if (key_len > USTORE_MAX_KEY_LEN) {
 			printf("[ustore] put: failed due to excessive key length: %u\n", key_len);
 			return false;
@@ -265,6 +266,7 @@ printf("[ustore] put: storing key %s with data len %u\n", bin_str(key, key_len),
 		hdr.ttl = ttl;
 		hdr.length = len;
 		hdr.flags = 0;
+		hdr.priority = priority;
 
 		hdr.crc = crc32(0,(uint8_t*)&hdr,sizeof(hdr)-4);
 		hdr.crc = crc32(hdr.crc,key,key_len);
@@ -290,7 +292,7 @@ printf("[ustore] put: storing key %s with data len %u\n", bin_str(key, key_len),
 		// If an existing record was updated then increment _dead_since_compact
 		if (index_find(key, key_len)) _dead_since_compact++;
 
-		index_insert(key, key_len, current_segment, offset, ts, ttl);
+		index_insert(key, key_len, current_segment, offset, ts, ttl, priority);
 
 		// Enforce max_recs: evict the oldest record(s) from the in-memory index
 		// when a new key pushes the count over the limit. Orphaned disk records
@@ -298,46 +300,46 @@ printf("[ustore] put: storing key %s with data len %u\n", bin_str(key, key_len),
 		if (policy_max_recs > 0 && _index.size() > policy_max_recs)
 			prune_index_to_max_recs_();
 
-		persist_index_entry(key, key_len, current_segment, offset, ts, ttl);
+		persist_index_entry(key, key_len, current_segment, offset, ts, ttl, priority);
 //printf("[ustore] put: key %s offset %u\n", bin_str(key, key_len), offset);
 
 		current_offset += sizeof(hdr)+key_len+len+sizeof(c);
 
 		compact_if_threshold();
 
-printf("[ustore] put: wrote key %s with data length %u\n", bin_str(key, key_len), len);
+printf("[ustore] put: wrote key %s with priority %u and data length %u\n", bin_str(key, key_len), priority, len);
 //printf("[ustore] put: %s\n", bin_str((uint8_t*)data, len));
 		return true;
 	}
 
-	inline bool put(const char* key, const uint8_t* data, uint16_t len, uint32_t ttl = 0, uint32_t ts = microStore::time())
+	inline bool put(const char* key, const uint8_t* data, uint16_t len, uint32_t ttl = 0, uint32_t ts = microStore::time(), uint8_t priority = 0)
 	{
-		return put((const uint8_t*)key, (uint8_t)strlen(key), data, len, ttl, ts);
+		return put((const uint8_t*)key, (uint8_t)strlen(key), data, len, ttl, ts, priority);
 	}
 
-	inline bool put(const char* key, const char* data, uint32_t ttl = 0, uint32_t ts = microStore::time())
+	inline bool put(const char* key, const char* data, uint32_t ttl = 0, uint32_t ts = microStore::time(), uint8_t priority = 0)
 	{
-		return put((const uint8_t*)key, (uint8_t)strlen(key), (const uint8_t*)data, (uint16_t)strlen(data), ttl, ts);
+		return put((const uint8_t*)key, (uint8_t)strlen(key), (const uint8_t*)data, (uint16_t)strlen(data), ttl, ts, priority);
 	}
 
-	inline bool put(const std::vector<uint8_t>& key, const uint8_t* data, uint16_t len, uint32_t ttl = 0, uint32_t ts = microStore::time())
+	inline bool put(const std::vector<uint8_t>& key, const uint8_t* data, uint16_t len, uint32_t ttl = 0, uint32_t ts = microStore::time(), uint8_t priority = 0)
 	{
-		return put(key.data(), (uint8_t)key.size(), data, len, ttl, ts);
+		return put(key.data(), (uint8_t)key.size(), data, len, ttl, ts, priority);
 	}
 
-	inline bool put(const std::vector<uint8_t>& key, const std::vector<uint8_t>& data, uint32_t ttl = 0, uint32_t ts = microStore::time())
+	inline bool put(const std::vector<uint8_t>& key, const std::vector<uint8_t>& data, uint32_t ttl = 0, uint32_t ts = microStore::time(), uint8_t priority = 0)
 	{
-		return put(key.data(), (uint8_t)key.size(), data.data(), (uint16_t)data.size(), ttl, ts);
+		return put(key.data(), (uint8_t)key.size(), data.data(), (uint16_t)data.size(), ttl, ts, priority);
 	}
 
-	inline bool put(const char* key, const std::string& data, uint32_t ttl = 0, uint32_t ts = microStore::time())
+	inline bool put(const char* key, const std::string& data, uint32_t ttl = 0, uint32_t ts = microStore::time(), uint8_t priority = 0)
 	{
-		return put((const uint8_t*)key, (uint8_t)strlen(key), (const uint8_t*)data.c_str(), (uint16_t)data.length(), ttl, ts);
+		return put((const uint8_t*)key, (uint8_t)strlen(key), (const uint8_t*)data.c_str(), (uint16_t)data.length(), ttl, ts, priority);
 	}
 
-	inline bool put(const std::string& key, const std::string& data, uint32_t ttl = 0, uint32_t ts = microStore::time())
+	inline bool put(const std::string& key, const std::string& data, uint32_t ttl = 0, uint32_t ts = microStore::time(), uint8_t priority = 0)
 	{
-		return put((const uint8_t*)key.c_str(), (uint8_t)key.length(), (const uint8_t*)data.c_str(), (uint16_t)data.length(), ttl, ts);
+		return put((const uint8_t*)key.c_str(), (uint8_t)key.length(), (const uint8_t*)data.c_str(), (uint16_t)data.length(), ttl, ts, priority);
 	}
 
 	/* -------- GET -------- */
@@ -692,11 +694,33 @@ private:
 		}
 	};
 
+	struct UInt24 {
+		uint8_t b0 = 0;
+		uint8_t b1 = 0;
+		uint8_t b2 = 0;
+
+		// Implicit Conversion Operator (Acts like automatic get())
+		operator uint32_t() const {
+			return (uint32_t)b0 |
+				((uint32_t)b1 << 8) |
+				((uint32_t)b2 << 16);
+		}
+
+		// Assignment Operator (Acts like automatic set())
+		UInt24& operator=(uint32_t v) {
+			b0 = (uint8_t)(v & 0xff);
+			b1 = (uint8_t)((v >> 8) & 0xff);
+			b2 = (uint8_t)((v >> 16) & 0xff);
+			return *this;
+		}
+	};
+
 	struct IndexValue {
-		uint32_t segment;
-		uint32_t offset;
+		uint8_t segment = 0;
+		UInt24 offset;
 		uint32_t timestamp;
-		uint32_t ttl;
+		UInt24 ttl;
+		uint8_t priority = 0;
 	};
 
 	template<typename T>
@@ -875,13 +899,14 @@ private:
 		return (it != _index.end()) ? &it->second : nullptr;
 	}
 
-	void index_insert(const uint8_t* key, uint8_t key_len, uint32_t seg, uint32_t off, uint32_t ts = 0, uint32_t ttl = 0)
+	void index_insert(const uint8_t* key, uint8_t key_len, uint32_t seg, uint32_t off, uint32_t ts = 0, uint32_t ttl = 0, uint8_t priority = 0)
 	{
 		IndexValue& iv = _index[make_key(key, key_len)];
 		iv.segment   = seg;
 		iv.offset    = off;
 		iv.timestamp = ts;
 		iv.ttl       = ttl;
+		iv.priority  = priority;
 	}
 
 	void index_remove(const uint8_t* key, uint8_t key_len)
@@ -897,7 +922,7 @@ private:
 		return effective_ttl > 0 && microStore::time() > ts && (microStore::time() - ts) >= effective_ttl;
 	}
 
-	// Evict the oldest records (by timestamp) until _index.size() <= policy_max_recs.
+	// Evict records by priority first (larger values first), then oldest timestamp.
 	// Returns the number of entries evicted.
 	// When to_evict == 1 (the common put() path), a simple O(n) scan is used to
 	// avoid heap allocation.  When to_evict > 1 (init / compact), a partial sort
@@ -907,26 +932,48 @@ private:
 		if (policy_max_recs == 0 || _index.size() <= policy_max_recs) return 0;
 
 		size_t to_evict = _index.size() - policy_max_recs;
+		auto evicts_before = [](const uint8_t a_priority, const uint32_t a_ts, const uint32_t a_ttl, const uint8_t b_priority, const uint32_t b_ts, const uint32_t b_ttl) {
+			// with this config, jumping from 2 to 3 prio is punished with 100% additional TTL penalty
+			static constexpr uint8_t priority_penalty_multiplier = 10;
+			static constexpr uint8_t priority_penalty_c = 3;
+			uint32_t a_penalty = (a_ttl / (a_priority + priority_penalty_c)) * a_priority * priority_penalty_multiplier;
+    		uint32_t b_penalty = (b_ttl / (b_priority + priority_penalty_c)) * b_priority * priority_penalty_multiplier;
+			return ((uint64_t)a_ts + b_penalty) < ((uint64_t)b_ts + a_penalty);
+		};
 
 		if (to_evict == 1) {
-			// Fast path: single linear scan for the oldest entry.
-			auto oldest = _index.begin();
-			for (auto it = _index.begin(); it != _index.end(); ++it)
-				if (it->second.timestamp < oldest->second.timestamp) oldest = it;
-			_index.erase(oldest);
+			// Fast path: single linear scan for the highest-ranked eviction entry.
+			auto evict = _index.begin();
+			for (auto it = _index.begin(); it != _index.end(); ++it) {
+				uint32_t it_effective_ttl = (it->second.ttl > 0) ? it->second.ttl : policy_ttl_secs;
+				uint32_t evict_effective_ttl = (evict->second.ttl > 0) ? evict->second.ttl : policy_ttl_secs;
+				if (evicts_before(it->second.priority, it->second.timestamp, it_effective_ttl, evict->second.priority, evict->second.timestamp, evict_effective_ttl))
+					evict = it;
+			}
+			_index.erase(evict);
 		} else {
-			// Bulk path: collect (timestamp, key) pairs, partial-sort, then erase.
-			using KTSPair = std::pair<uint32_t, KeyType>;
-			using KTSAlloc = rebind_alloc<KTSPair>;
-			KTSAlloc kts_alloc(_alloc);
-			std::vector<KTSPair, KTSAlloc> candidates(kts_alloc);
+			// Bulk path: collect eviction-ranked entries, partial-sort, then erase.
+			struct EvictionCandidate {
+				uint8_t priority;
+				uint32_t timestamp;
+				uint32_t ttl;
+				KeyType key;
+			};
+			using CandidateAlloc = rebind_alloc<EvictionCandidate>;
+			CandidateAlloc candidate_alloc(_alloc);
+			std::vector<EvictionCandidate, CandidateAlloc> candidates(candidate_alloc);
 			candidates.reserve(_index.size());
 			for (auto& kv : _index)
-				candidates.push_back(std::make_pair(kv.second.timestamp, kv.first));
+			{
+				uint32_t effective_ttl = (kv.second.ttl > 0) ? kv.second.ttl : policy_ttl_secs;
+				candidates.push_back(EvictionCandidate{kv.second.priority, kv.second.timestamp, effective_ttl, kv.first});
+			}
 			std::partial_sort(candidates.begin(), candidates.begin() + (long)to_evict, candidates.end(),
-				[](const KTSPair& a, const KTSPair& b){ return a.first < b.first; });
+				[evicts_before](const EvictionCandidate& a, const EvictionCandidate& b) {
+					return evicts_before(a.priority, a.timestamp, a.ttl, b.priority, b.timestamp, b.ttl);
+				});
 			for (size_t i = 0; i < to_evict; i++) {
-				_index.erase(candidates[i].second);
+				_index.erase(candidates[i].key);
 			}
 		}
 		// Record(s) evicted so increment _dead_since_compact
@@ -938,7 +985,7 @@ printf("[ustore] Evicted %lu records to policy_max_recs\n", to_evict);
 
 	/* -------- INDEX FILE -------- */
 
-	bool persist_index_entry(const uint8_t* key, uint8_t key_len, uint32_t seg, uint32_t off, uint32_t ts = 0, uint32_t ttl = 0)
+	bool persist_index_entry(const uint8_t* key, uint8_t key_len, uint32_t seg, uint32_t off, uint32_t ts = 0, uint32_t ttl = 0, uint8_t priority = 0)
 	{
 		if (!index_file) {
 			printf("[ustore] ERROR: Index file is not valid\n");
@@ -951,6 +998,7 @@ printf("[ustore] Evicted %lu records to policy_max_recs\n", to_evict);
 		index_file.write(&off, 4);
 		index_file.write(&ts, 4);
 		index_file.write(&ttl, 4);
+		index_file.write(&priority, 1);
 		index_file.flush();  // explicit fsync — guarantees entry reaches flash
 
 		return true;
@@ -970,8 +1018,8 @@ printf("[ustore] Evicted %lu records to policy_max_recs\n", to_evict);
 			uint32_t seg     = kv.second.segment;
 			uint32_t off     = kv.second.offset;
 			uint32_t ts      = kv.second.timestamp;
-
 			uint32_t ttl     = kv.second.ttl;
+			uint8_t priority = kv.second.priority;
 
 			f.write(&key_len, 1);
 			f.write(kv.first.data(), key_len);
@@ -979,6 +1027,7 @@ printf("[ustore] Evicted %lu records to policy_max_recs\n", to_evict);
 			f.write(&off, 4);
 			f.write(&ts, 4);
 			f.write(&ttl, 4);
+			f.write(&priority, 1);
 		}
 
 		f.flush();
@@ -1010,12 +1059,14 @@ printf("[ustore] Evicted %lu records to policy_max_recs\n", to_evict);
 			if(f.read(&ts, 4) != 4) break;
 			uint32_t ttl = 0;
 			if(f.read(&ttl, 4) != 4) break;
+			uint8_t priority = 0;
+			if(f.read(&priority, 1) != 1) break;
 
 			// seg==0xFFFFFFFF is a deletion sentinel written by remove()
 			if(seg==0xFFFFFFFF)
 				index_remove(key, key_len);
 			else
-				index_insert(key, key_len, seg, off, ts, ttl);
+				index_insert(key, key_len, seg, off, ts, ttl, priority);
 		}
 
 		f.close();
@@ -1264,7 +1315,7 @@ printf("[ustore] Removing file: %s\n", sname);
 				if (f.read(&c, sizeof(c)) != sizeof(c)) break;
 				if (c.magic != MAGIC_COMMIT) break;
 				if (!(hdr.flags & FLAG_DELETE))
-					index_insert(key_buf, hdr.key_len, 0, scan_offset, hdr.timestamp, hdr.ttl);
+					index_insert(key_buf, hdr.key_len, 0, scan_offset, hdr.timestamp, hdr.ttl, hdr.priority);
 				scan_offset += sizeof(hdr) + hdr.key_len + hdr.length + sizeof(c);
 			}
 			f.close();
@@ -1316,7 +1367,7 @@ printf("[ustore] Removing file: %s\n", sname);
 				if (hdr.flags & FLAG_DELETE)
 					index_remove(key_buf, hdr.key_len);
 				else
-					index_insert(key_buf, hdr.key_len, seg, scan_offset, hdr.timestamp, hdr.ttl);
+					index_insert(key_buf, hdr.key_len, seg, scan_offset, hdr.timestamp, hdr.ttl, hdr.priority);
 				scan_offset += sizeof(hdr) + hdr.key_len + hdr.length + sizeof(c);
 			}
 			f.close();

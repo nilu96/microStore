@@ -18,6 +18,7 @@
 
 #include "../File.h"
 #include "../FileSystem.h"
+#include "../Log.h"
 
 #include <SPIFFS.h>
 
@@ -90,19 +91,19 @@ protected:
 	public:
 
 		virtual bool format() override {
-			printf("[ustore] Formatting SPIFFSFileSystem\n");
+			USTORE_LOG("[ustore] Formatting SPIFFSFileSystem\n");
 			if (!SPIFFS.format()) {
-				printf("[ustore] Failed to format SPIFFSFileSystem!\n");
+				USTORE_LOG("[ustore] Failed to format SPIFFSFileSystem!\n");
 				return false;
 			}
 			return true;
 		}
 
 		virtual bool init(bool reformatOnFail = true) override {
-			printf("[ustore] Initializing SPIFFSFileSystem\n");
+			USTORE_LOG("[ustore] Initializing SPIFFSFileSystem\n");
 			// Initialize SPIFFS
 			if (!SPIFFS.begin(true, "")) {
-				printf("[ustore] Failed to initialize SPIFFSFileSystem!\n");
+				USTORE_LOG("[ustore] Failed to initialize SPIFFSFileSystem!\n");
 				return false;
 			}
 			if (reformatOnFail) {
@@ -116,12 +117,12 @@ protected:
 					init_test.close();
 				}
 				if (!verified) {
-					printf("[ustore] WARNING: SPIFFSFileSystem check failed, reformatting!\n");
+					USTORE_LOG("[ustore] WARNING: SPIFFSFileSystem check failed, reformatting!\n");
 					format();
 				}
 				else {
 					remove("./__init_test__");
-					printf("[ustore] SPIFFSFileSystem check passed!\n");
+					USTORE_LOG("[ustore] SPIFFSFileSystem check passed!\n");
 				}
 			}
 			return true;

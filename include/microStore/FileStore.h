@@ -16,6 +16,7 @@
 
 #include "File.h"
 #include "FileSystem.h"
+#include "Log.h"
 #include "Utility.h"
 
 #include <stdint.h>
@@ -141,7 +142,7 @@ public:
 	{
 		if (segment_size > 0) _segment_size = segment_size;
 		if (segment_count > 0) _segment_count = segment_count;
-		printf("[ustore] init: Initializing FileStore with prefix=%s, segment_size=%lu, segment_count=%u\n", prefix, _segment_size, _segment_count);
+		USTORE_LOG("[ustore] init: Initializing FileStore with prefix=%s, segment_size=%u, segment_count=%u\n", prefix, _segment_size, _segment_count);
 
 		_filesystem = filesystem;
 		strncpy(base_prefix, prefix, sizeof(base_prefix));
@@ -184,7 +185,7 @@ public:
 	}
 
 	void close() {
-		printf("[ustore] close: Closing FileStore\n");
+		USTORE_LOG("[ustore] close: Closing FileStore\n");
 		flush_buffer();
 		if (index_file) index_file.close();
 		if (active_file) active_file.close();
@@ -192,9 +193,9 @@ public:
 
 	void clear()
 	{
-		printf("[ustore] clear: Clearing FileStore\n");
+		USTORE_LOG("[ustore] clear: Clearing FileStore\n");
         if (!isValid()) {
-			printf("[ustore] clear: store is invalid, skipping!\n");
+			USTORE_LOG("[ustore] clear: store is invalid, skipping!\n");
 			return;
 		}
 
@@ -214,13 +215,13 @@ public:
 		for(uint32_t i = 0; i < _segment_count; i++)
 		{
 			segment_name(i,name);
-			//printf("[ustore] clear: removing segment file: %s\n", name);
-//printf("[ustore] Removing file: %s\n", name);
+			//USTORE_LOG("[ustore] clear: removing segment file: %s\n", name);
+//USTORE_LOG("[ustore] Removing file: %s\n", name);
 			_filesystem.remove(name);
 		}
 
 		index_name(name);
-		//printf("[ustore] clear: removing index file: %s\n", name);
+		//USTORE_LOG("[ustore] clear: removing index file: %s\n", name);
 		_filesystem.remove(name);
 
 		_index.clear();
@@ -238,17 +239,17 @@ public:
 	bool put(const uint8_t* key, uint8_t key_len, const uint8_t* data, uint16_t len, uint32_t ttl = 0, uint32_t ts = microStore::time())
 	{
         if (!isValid()) {
-			printf("[ustore] put: store is invalid\n");
+			USTORE_LOG("[ustore] put: store is invalid\n");
 			return false;
 		}
 
-printf("[ustore] put: storing key %s with data len %u\n", bin_str(key, key_len), len);
+USTORE_LOG("[ustore] put: storing key %s with data len %u\n", bin_str(key, key_len), len);
 		if (key_len > USTORE_MAX_KEY_LEN) {
-			printf("[ustore] put: failed due to excessive key length: %u\n", key_len);
+			USTORE_LOG("[ustore] put: failed due to excessive key length: %u\n", key_len);
 			return false;
 		}
 		if (len > USTORE_MAX_VALUE_LEN) {
-			printf("[ustore] put: failed due to excessive data length: %u\n", len);
+			USTORE_LOG("[ustore] put: failed due to excessive data length: %u\n", len);
 			return false;
 		}
 
@@ -299,14 +300,14 @@ printf("[ustore] put: storing key %s with data len %u\n", bin_str(key, key_len),
 			prune_index_to_max_recs_();
 
 		persist_index_entry(key, key_len, current_segment, offset, ts, ttl);
-//printf("[ustore] put: key %s offset %u\n", bin_str(key, key_len), offset);
+//USTORE_LOG("[ustore] put: key %s offset %u\n", bin_str(key, key_len), offset);
 
 		current_offset += sizeof(hdr)+key_len+len+sizeof(c);
 
 		compact_if_threshold();
 
-printf("[ustore] put: wrote key %s with data length %u\n", bin_str(key, key_len), len);
-//printf("[ustore] put: %s\n", bin_str((uint8_t*)data, len));
+USTORE_LOG("[ustore] put: wrote key %s with data length %u\n", bin_str(key, key_len), len);
+//USTORE_LOG("[ustore] put: %s\n", bin_str((uint8_t*)data, len));
 		return true;
 	}
 
@@ -345,13 +346,13 @@ printf("[ustore] put: wrote key %s with data length %u\n", bin_str(key, key_len)
 	bool get(const uint8_t* key, uint8_t key_len, uint8_t* out, uint16_t* size)
 	{
         if (!isValid()) {
-			printf("[ustore] get: store is invalid\n");
+			USTORE_LOG("[ustore] get: store is invalid\n");
 			return false;
 		}
 
-printf("[ustore] get: fetching key %s with data size %u\n", bin_str(key, key_len), *size);
+USTORE_LOG("[ustore] get: fetching key %s with data size %u\n", bin_str(key, key_len), *size);
 		if (key_len > USTORE_MAX_KEY_LEN) {
-			printf("[ustore] get: failed due to excessive key length: %u\n", key_len);
+			USTORE_LOG("[ustore] get: failed due to excessive key length: %u\n", key_len);
 			return false;
 		}
 
@@ -359,14 +360,14 @@ printf("[ustore] get: fetching key %s with data size %u\n", bin_str(key, key_len
 
 		IndexValue* e = index_find(key, key_len);
 		if (!e) {
-			printf("[ustore] get: key %s not found in index\n", bin_str(key, key_len));
+			USTORE_LOG("[ustore] get: key %s not found in index\n", bin_str(key, key_len));
 			return false;
 		}
-//printf("[ustore] get: key %s offset %lu\n", bin_str(key, key_len), e->offset);
+//USTORE_LOG("[ustore] get: key %s offset %lu\n", bin_str(key, key_len), e->offset);
 
 		if (is_ttl_expired_(e->timestamp, e->ttl)) {
 			index_remove(key, key_len);
-			printf("[ustore] get: key %s expired by TTL\n", bin_str(key, key_len));
+			USTORE_LOG("[ustore] get: key %s expired by TTL\n", bin_str(key, key_len));
 			return false;
 		}
 
@@ -375,7 +376,7 @@ printf("[ustore] get: fetching key %s with data size %u\n", bin_str(key, key_len
 
 		File f = _filesystem.open(name, File::ModeRead);
 		if (!f) {
-			printf("[ustore] get: key %s failed to open file %s\n", bin_str(key, key_len), name);
+			USTORE_LOG("[ustore] get: key %s failed to open file %s\n", bin_str(key, key_len), name);
 			return false;
 		}
 
@@ -385,9 +386,9 @@ printf("[ustore] get: fetching key %s with data size %u\n", bin_str(key, key_len
 
 		//if (f.read(&hdr, sizeof(hdr)) != sizeof(hdr)) {
 		size_t len = f.read(&hdr, sizeof(hdr));
-//printf("[ustore] get: key %s read header of size %u\n", bin_str(key, key_len), len);
+//USTORE_LOG("[ustore] get: key %s read header of size %u\n", bin_str(key, key_len), len);
 		if (len != sizeof(hdr)) {
-			printf("[ustore] get: key %s header read failed\n", bin_str(key, key_len));
+			USTORE_LOG("[ustore] get: key %s header read failed\n", bin_str(key, key_len));
 			f.close();
 			return false;
 		}
@@ -396,7 +397,7 @@ printf("[ustore] get: fetching key %s with data size %u\n", bin_str(key, key_len
 			hdr.key_len > USTORE_MAX_KEY_LEN ||
 			hdr.length > USTORE_MAX_VALUE_LEN)
 		{
-			printf("[ustore] get: key %s has corrupted record\n", bin_str(key, key_len));
+			USTORE_LOG("[ustore] get: key %s has corrupted record\n", bin_str(key, key_len));
 			f.close();
 			return false;
 		}
@@ -406,7 +407,7 @@ printf("[ustore] get: fetching key %s with data size %u\n", bin_str(key, key_len
 			f.seek((long)(e->offset+sizeof(hdr)+hdr.key_len), SeekModeSet);
 			size_t read = std::min(hdr.length, *size);
 			if (f.read(out, read) != read) {
-				printf("[ustore] get: key %s value read failed\n", bin_str(key, key_len));
+				USTORE_LOG("[ustore] get: key %s value read failed\n", bin_str(key, key_len));
 				f.close();
 				return false;
 			}
@@ -416,8 +417,8 @@ printf("[ustore] get: fetching key %s with data size %u\n", bin_str(key, key_len
 
 		f.close();
 
-printf("[ustore] get: returning key %s with data length %u\n", bin_str(key, key_len), *size);
-//printf("[ustore] get: %s\n", bin_str((uint8_t*)out, *size));
+USTORE_LOG("[ustore] get: returning key %s with data length %u\n", bin_str(key, key_len), *size);
+//USTORE_LOG("[ustore] get: %s\n", bin_str((uint8_t*)out, *size));
 		return true;
 	}
 
@@ -480,7 +481,7 @@ printf("[ustore] get: returning key %s with data length %u\n", bin_str(key, key_
 	bool remove(const uint8_t* key, uint8_t key_len)
 	{
         if (!isValid()) {
-			printf("[ustore] remove: store is invalid\n");
+			USTORE_LOG("[ustore] remove: store is invalid\n");
 			return false;
 		}
 
@@ -534,7 +535,7 @@ printf("[ustore] get: returning key %s with data length %u\n", bin_str(key, key_
 	bool exists(const uint8_t* key, uint8_t key_len)
 	{
         if (!isValid()){
-			printf("[ustore] exists: store is invalid\n");
+			USTORE_LOG("[ustore] exists: store is invalid\n");
 			return false;
 		}
 		if(key_len > USTORE_MAX_KEY_LEN) return false;
@@ -559,7 +560,7 @@ printf("[ustore] get: returning key %s with data length %u\n", bin_str(key, key_
 	inline size_t size() const
 	{
         if (!isValid()) {
-			printf("[ustore] size: store is invalid\n");
+			USTORE_LOG("[ustore] size: store is invalid\n");
 			return 0;
 		}
 		return _index.size();
@@ -856,7 +857,7 @@ private:
 	{
 		if (write_buf_pos == 0) return true;
 		if (!active_file) {
-			printf("[ustore] ERROR: Active file is not valid, failed to flush buffer\n");
+			USTORE_LOG("[ustore] ERROR: Active file is not valid, failed to flush buffer\n");
 			// CBA Must reset buffer pos to avoid an infinite flushing loop
 			write_buf_pos = 0;
 			return false;
@@ -931,7 +932,7 @@ private:
 		}
 		// Record(s) evicted so increment _dead_since_compact
 		_dead_since_compact += to_evict;
-printf("[ustore] Evicted %lu records to policy_max_recs\n", to_evict);
+USTORE_LOG("[ustore] Evicted %lu records to policy_max_recs\n", to_evict);
 
 		return to_evict;
 	}
@@ -941,7 +942,7 @@ printf("[ustore] Evicted %lu records to policy_max_recs\n", to_evict);
 	bool persist_index_entry(const uint8_t* key, uint8_t key_len, uint32_t seg, uint32_t off, uint32_t ts = 0, uint32_t ttl = 0)
 	{
 		if (!index_file) {
-			printf("[ustore] ERROR: Index file is not valid\n");
+			USTORE_LOG("[ustore] ERROR: Index file is not valid\n");
 			return false;
 		}
 
@@ -1081,17 +1082,17 @@ printf("[ustore] Evicted %lu records to policy_max_recs\n", to_evict);
 	bool open_segment(uint32_t id)
 	{
 		if (active_file) {
-printf("[ustore] Closing active file\n");
+USTORE_LOG("[ustore] Closing active file\n");
 			active_file.close();
 		}
 
 		char name[USTORE_MAX_FILENAME_LEN];
 		segment_name(id,name);
 
-printf("[ustore] Opening active file: %s\n", name);
+USTORE_LOG("[ustore] Opening active file: %s\n", name);
 		active_file = _filesystem.open(name, File::ModeReadAppend);
 		if (!active_file) {
-			printf("[ustore] ERROR: Failed to open active file: %s\n", name);
+			USTORE_LOG("[ustore] ERROR: Failed to open active file: %s\n", name);
 			return false;
 		}
 		current_segment=id;
@@ -1105,11 +1106,11 @@ printf("[ustore] Opening active file: %s\n", name);
 		if (current_offset + write_size + sizeof(RecordHeader) + sizeof(RecordCommit) < _segment_size)
 			return true;
 
-printf("[ustore] Rotating segment...\n");
+USTORE_LOG("[ustore] Rotating segment...\n");
 		flush_buffer();
 
 		if (active_file) {
-printf("[ustore] Closing active file\n");
+USTORE_LOG("[ustore] Closing active file\n");
 			active_file.close();
 		}
 
@@ -1119,7 +1120,7 @@ printf("[ustore] Closing active file\n");
 			if (compact_in_cooldown &&
 				(microStore::millis() - compact_cooldown_start_ms) < USTORE_COMPACT_RETRY_MS)
 			{
-				printf("[ustore] Compact skipped: cooldown active\n");
+				USTORE_LOG("[ustore] Compact skipped: cooldown active\n");
 				current_segment = _segment_count - 1;
 				open_segment(current_segment);
 				return false;
@@ -1168,7 +1169,7 @@ printf("[ustore] Closing active file\n");
 #if USTORE_COMPACT_THRESHOLD > 0
 		uint32_t total = (uint32_t)_index.size() + _dead_since_compact;
 		if (total > 0 && _dead_since_compact * 100 / total >= USTORE_COMPACT_THRESHOLD) {
-printf("[ustore] Compaction triggered by deleted threshold\n");
+USTORE_LOG("[ustore] Compaction triggered by deleted threshold\n");
 			if (compact()) {
 				// After threshold-triggered compaction, seg0 holds the compacted data.
 				// Open seg1 for new writes, mirroring what rotate_segment_if_needed() does
@@ -1239,7 +1240,7 @@ printf("[ustore] Compaction triggered by deleted threshold\n");
 		for (uint32_t i = 0; i < _segment_count; i++) {
 			char sname[USTORE_MAX_FILENAME_LEN];
 			segment_name(i, sname);
-printf("[ustore] Removing file: %s\n", sname);
+USTORE_LOG("[ustore] Removing file: %s\n", sname);
 			_filesystem.remove(sname);
 		}
 		if (!_filesystem.rename(tmp_name, seg0)) {
@@ -1290,7 +1291,7 @@ printf("[ustore] Removing file: %s\n", sname);
 	// boots are fast.  Uses the same record-walk logic as finalize_compaction().
 	void rebuild_index_from_segments()
 	{
-		printf("[ustore] Index missing — rebuilding from segment files...\n");
+		USTORE_LOG("[ustore] Index missing — rebuilding from segment files...\n");
 		_index.clear();
 
 		for (uint32_t seg = 0; seg < _segment_count; seg++)
@@ -1334,13 +1335,13 @@ printf("[ustore] Removing file: %s\n", sname);
 public:
 	bool compact()
 	{
-printf("[ustore] Compacting storage...\n");
+USTORE_LOG("[ustore] Compacting storage...\n");
 
 		// --- Phase 1: write COMPACTING journal (next_seg=0: no source segments deleted yet) ---
 		write_journal(JOURNAL_COMPACTING, 0, 0);
 
 		char tmp_name[USTORE_MAX_FILENAME_LEN]; snprintf(tmp_name, sizeof(tmp_name), "%s_compact.tmp", base_prefix);
-printf("[ustore] Opening tmp file: %s\n", tmp_name);
+USTORE_LOG("[ustore] Opening tmp file: %s\n", tmp_name);
 		File outf = _filesystem.open(tmp_name, File::ModeWrite);
 		if (!outf) { clear_journal(); return false; }
 
@@ -1385,31 +1386,31 @@ printf("[ustore] Opening tmp file: %s\n", tmp_name);
 			}
 			std::sort(offsets.begin(), offsets.end());
 
-printf("[ustore] Processing segment: %u, size: %lu\n", s, (unsigned long)offsets.size());
+USTORE_LOG("[ustore] Processing segment: %u, size: %lu\n", s, (unsigned long)offsets.size());
 			char src_name[USTORE_MAX_FILENAME_LEN]; segment_name(s, src_name);
 			if (!offsets.empty()) {
-printf("[ustore] Opening src file: %s\n", src_name);
+USTORE_LOG("[ustore] Opening src file: %s\n", src_name);
 				File src = _filesystem.open(src_name, File::ModeRead);
 				if (src) {
 					for (size_t i = 0; i < offsets.size(); i++) {
 						uint32_t off = offsets[i];
-printf("[ustore] Processing record: %u offset: %lu\n", (unsigned)i, (unsigned long)off);
+USTORE_LOG("[ustore] Processing record: %u offset: %lu\n", (unsigned)i, (unsigned long)off);
 						src.seek((long)off, SeekModeSet);
 						RecordHeader hdr;
 						if (src.read(&hdr, sizeof(hdr)) != sizeof(hdr)) {
-printf("[ustore] WARNING: Failed to read record header\n");
+USTORE_LOG("[ustore] WARNING: Failed to read record header\n");
 							continue;
 						}
 						if (hdr.magic != MAGIC_RECORD || hdr.key_len > USTORE_MAX_KEY_LEN || hdr.length > USTORE_MAX_VALUE_LEN) {
-printf("[ustore] WARNING: Record magic number incorrect\n");
+USTORE_LOG("[ustore] WARNING: Record magic number incorrect\n");
 							continue;
 						}
 						if (src.read(key_buf, hdr.key_len) != hdr.key_len) {
-printf("[ustore] WARNING: Failed to read record key\n");
+USTORE_LOG("[ustore] WARNING: Failed to read record key\n");
 							continue;
 						}
 						if (hdr.length > 0 && src.read(val_buf, hdr.length) != hdr.length) {
-printf("[ustore] WARNING: Failed to read record value\n");
+USTORE_LOG("[ustore] WARNING: Failed to read record value\n");
 							continue;
 						}
 						RecordCommit c; c.magic = MAGIC_COMMIT;
@@ -1421,11 +1422,11 @@ printf("[ustore] WARNING: Failed to read record value\n");
 						written += outf.write(&c, sizeof(c));
 						if (written != expected) { write_ok = false; break; }
 					}
-printf("[ustore] Closing src file: %s\n", src_name);
+USTORE_LOG("[ustore] Closing src file: %s\n", src_name);
 					src.close();
 				}
 				else {
-					printf("[ustore] ERROR: Failed to open src file: %s\n", src_name);
+					USTORE_LOG("[ustore] ERROR: Failed to open src file: %s\n", src_name);
 				}
 			}
 
@@ -1440,20 +1441,20 @@ printf("[ustore] Closing src file: %s\n", src_name);
 		}
 
 		outf.flush();
-printf("[ustore] Closing tmp file: %s\n", tmp_name);
+USTORE_LOG("[ustore] Closing tmp file: %s\n", tmp_name);
 		outf.close();
 
 		if (!write_ok) {
 			if (committed_segs == 0) {
 				// No source segments were deleted — safe to discard compact.tmp entirely.
-				printf("[ustore] Compact aborted: storage full, all segments preserved\n");
+				USTORE_LOG("[ustore] Compact aborted: storage full, all segments preserved\n");
 				_filesystem.remove(tmp_name);
 				clear_journal();
 			} else {
 				// Some source segments were already deleted; compact.tmp holds their records.
 				// Leave compact.tmp and the journal in place. recover_if_needed() on the
 				// next boot will rename compact.tmp to segment 0 and recover cleanly.
-				printf("[ustore] Compact aborted mid-way after %u segments: recovery on next boot\n",
+				USTORE_LOG("[ustore] Compact aborted mid-way after %u segments: recovery on next boot\n",
 				       committed_segs);
 			}
 			return false;

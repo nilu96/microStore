@@ -18,6 +18,7 @@
 
 #include "../File.h"
 #include "../FileSystem.h"
+#include "../Log.h"
 
 #include <SPI.h>
 #include <SD.h>
@@ -96,21 +97,21 @@ protected:
 
 		virtual bool format() override {
 			// CBA No format in SDFS?
-			//printf("[ustore] Formatting SDFileSystem\n");
+			//USTORE_LOG("[ustore] Formatting SDFileSystem\n");
 			//if (!SD.format()) {
-//				printf("[ustore] Failed to format SDFileSystem!\n");
+//				USTORE_LOG("[ustore] Failed to format SDFileSystem!\n");
 			//	return false;
 			//}
 			return true;
 		}
 
 		virtual bool init(bool reformatOnFail = true) override {
-			printf("[ustore] Initializing SDFileSystem\n");
+			USTORE_LOG("[ustore] Initializing SDFileSystem\n");
 			// Initialize SDFileSystem
 			pinMode(_miso, INPUT_PULLUP);
 			_spi.begin(_sck, _miso, _mosi, _ss);
 			if (!SD.begin(_ss, _spi)) {
-				printf("[ustore] Failed to initialize SD card for SDFileSystem!\n");
+				USTORE_LOG("[ustore] Failed to initialize SD card for SDFileSystem!\n");
 				return false;
 			}
 			if (reformatOnFail) {
@@ -124,12 +125,12 @@ protected:
 					init_test.close();
 				}
 				if (!verified) {
-					printf("[ustore] WARNING: SDFileSystem check failed, reformatting!\n");
+					USTORE_LOG("[ustore] WARNING: SDFileSystem check failed, reformatting!\n");
 					format();
 				}
 				else {
 					remove("./__init_test__");
-					printf("[ustore] SDFileSystem check passed!\n");
+					USTORE_LOG("[ustore] SDFileSystem check passed!\n");
 				}
 			}
 			return true;

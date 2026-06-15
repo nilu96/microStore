@@ -18,6 +18,7 @@
 
 #include "../File.h"
 #include "../FileSystem.h"
+#include "../Log.h"
 
 #if defined(ESP32)
 #include <LittleFS.h>
@@ -193,9 +194,9 @@ protected:
 
 		virtual bool format() override {
 #if defined(ESP32)
-			printf("[ustore] Formatting StdioFileSystem\n");
+			USTORE_LOG("[ustore] Formatting StdioFileSystem\n");
 			if (!LittleFS.format()) {
-				printf("[ustore] Failed to format StdioFileSystem!\n");
+				USTORE_LOG("[ustore] Failed to format StdioFileSystem!\n");
 				return false;
 			}
 			return true;
@@ -205,11 +206,11 @@ protected:
 		}
 
 		inline virtual bool init(bool reformatOnFail = true) override {
-			printf("[ustore] Initializing StdioFileSystem\n");
+			USTORE_LOG("[ustore] Initializing StdioFileSystem\n");
 #if defined(ESP32)
 			// Initialize LittleFS for POSIX file access
 			if (!LittleFS.begin(true, _basepath)) {
-				printf("[ustore] Failed to initialize StdioFileSystem!\n");
+				USTORE_LOG("[ustore] Failed to initialize StdioFileSystem!\n");
 				return false;
 			}
 #endif
@@ -224,12 +225,12 @@ protected:
 					init_test.close();
 				}
 				if (!verified) {
-					printf("[ustore] WARNING: StdioFileSystem check failed, reformatting!\n");
+					USTORE_LOG("[ustore] WARNING: StdioFileSystem check failed, reformatting!\n");
 					format();
 				}
 				else {
 					remove("./__init_test__");
-					printf("[ustore] StdioFileSystem check passed!\n");
+					USTORE_LOG("[ustore] StdioFileSystem check passed!\n");
 				}
 			}
 			return true;

@@ -18,6 +18,7 @@
 
 #include "../File.h"
 #include "../FileSystem.h"
+#include "../Log.h"
 
 #include <Cached_SPIFlash.h>
 #include <FlashFileSystem.h>
@@ -134,27 +135,27 @@ protected:
 	public:
 
 		virtual bool format() override {
-			printf("[ustore] Formatting FlashFSFileSystem\n");
+			USTORE_LOG("[ustore] Formatting FlashFSFileSystem\n");
 			if (!FlashFS.format()) {
-				printf("[ustore] Failed to format FlashFSFileSystem!\n");
+				USTORE_LOG("[ustore] Failed to format FlashFSFileSystem!\n");
 				return false;
 			}
 			return true;
 		}
 
 		virtual bool init(bool reformatOnFail = true) override {
-			printf("[ustore] Initializing FlashFSFileSystem\n");
+			USTORE_LOG("[ustore] Initializing FlashFSFileSystem\n");
 			// Initialize FlashFSFileSystem
 			if (!_device) {
-				printf("[ustore] No flash device specified for FlashFSFileSystem!\n");
+				USTORE_LOG("[ustore] No flash device specified for FlashFSFileSystem!\n");
 				return false;
 			}
 			if (!_flash.begin(_device)) {
-				printf("[ustore] ERROR: Failed to initialize device for FlashFSFileSystem!\n");
+				USTORE_LOG("[ustore] ERROR: Failed to initialize device for FlashFSFileSystem!\n");
 				return false;
 			}
 			if (!FlashFS.begin(&_flash)) {
-				printf("[ustore] ERROR: Failed to initialize FlashFSFileSystem!\n");
+				USTORE_LOG("[ustore] ERROR: Failed to initialize FlashFSFileSystem!\n");
 				return false;
 			}
 			if (reformatOnFail) {
@@ -168,12 +169,12 @@ protected:
 					init_test.close();
 				}
 				if (!verified) {
-					printf("[ustore] WARNING: FlashFSFileSystem check failed, reformatting!\n");
+					USTORE_LOG("[ustore] WARNING: FlashFSFileSystem check failed, reformatting!\n");
 					format();
 				}
 				else {
 					remove("./__init_test__");
-					printf("[ustore] FlashFSFileSystem check passed!\n");
+					USTORE_LOG("[ustore] FlashFSFileSystem check passed!\n");
 				}
 			}
 			return true;

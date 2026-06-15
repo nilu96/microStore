@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "Log.h"
 #include "Utility.h"
 
 #include <stdint.h>
@@ -55,7 +56,7 @@ public:
 	inline operator bool() const { return isValid(); }
 
     bool init(bool clearOnInit = false) {
-		printf("[ustore] init: Initializing HeapStore\n");
+		USTORE_LOG("[ustore] init: Initializing HeapStore\n");
 		if (clearOnInit) {
 			clear();
 		}
@@ -63,7 +64,7 @@ public:
     }
 
 	void close() {
-		printf("[ustore] close: Closing HeapStore\n");
+		USTORE_LOG("[ustore] close: Closing HeapStore\n");
 	}
 
     /* -------- PUT -------- */
@@ -73,11 +74,11 @@ public:
         if (!isValid()) return false;
 
         if (key_len > USTORE_MAX_KEY_LEN) {
-            printf("[heapstore] put failed due to excessive key length: %u\n", key_len);
+            USTORE_LOG("[heapstore] put failed due to excessive key length: %u\n", key_len);
             return false;
         }
         if (len > USTORE_MAX_VALUE_LEN) {
-            printf("[heapstore] put failed due to excessive data length: %u\n", len);
+            USTORE_LOG("[heapstore] put failed due to excessive data length: %u\n", len);
             return false;
         }
 
@@ -128,7 +129,7 @@ public:
         if (!isValid()) return false;
 
         if (key_len > USTORE_MAX_KEY_LEN) {
-            printf("[heapstore] get failed due to excessive key length: %u\n", key_len);
+            USTORE_LOG("[heapstore] get failed due to excessive key length: %u\n", key_len);
             return false;
         }
 
@@ -223,7 +224,7 @@ public:
     /* -------- CLEAR -------- */
 
     void clear() {
-		printf("[ustore] close: Clearing HeapStore\n");
+		USTORE_LOG("[ustore] close: Clearing HeapStore\n");
         if (!isValid()) return;
         data_.clear();
     }

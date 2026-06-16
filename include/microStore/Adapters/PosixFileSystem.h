@@ -17,6 +17,7 @@
 
 #include "../File.h"
 #include "../FileSystem.h"
+#include "../Log.h"
 
 #if defined(ESP32)
 #include <LittleFS.h>
@@ -203,9 +204,9 @@ protected:
 
 		virtual bool format() override {
 #if defined(ESP32)
-			printf("[ustore] Formatting PosixFileSystem\n");
+			USTORE_LOG("[ustore] Formatting PosixFileSystem\n");
 			if (!LittleFS.format()) {
-				printf("[ustore] Failed to format PosixFileSystem!\n");
+				USTORE_LOG("[ustore] Failed to format PosixFileSystem!\n");
 				return false;
 			}
 			return true;
@@ -215,11 +216,11 @@ protected:
 		}
 
 		inline virtual bool init(bool reformatOnFail = true) override {
-			printf("[ustore] Initializing PosixFileSystem\n");
+			USTORE_LOG("[ustore] Initializing PosixFileSystem\n");
 #if defined(ESP32)
 			// Initialize LittleFS for POSIX file access
 			if (!LittleFS.begin(true, _basepath)) {
-				printf("[ustore] Failed to initialize PosixFileSystem!\n");
+				USTORE_LOG("[ustore] Failed to initialize PosixFileSystem!\n");
 				return false;
 			}
 #endif
@@ -234,12 +235,12 @@ protected:
 					init_test.close();
 				}
 				if (!verified) {
-					printf("[ustore] WARNING: PosixFileSystem check failed, reformatting!\n");
+					USTORE_LOG("[ustore] WARNING: PosixFileSystem check failed, reformatting!\n");
 					format();
 				}
 				else {
 					remove("./__init_test__");
-					printf("[ustore] PosixFileSystem check passed!\n");
+					USTORE_LOG("[ustore] PosixFileSystem check passed!\n");
 				}
 			}
 			return true;

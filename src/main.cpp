@@ -87,7 +87,7 @@ void setup() {
 		printf("Testing PosixFileSystem...\n");
 		microStore::FileSystem filesystem{microStore::Adapters::PosixFileSystem()};
 		if (filesystem.init()) {
-			printf("size=%u available=%u\n", filesystem.storageSize(), filesystem.storageAvailable());
+			printf("size=%u available=%u\n", (uint32_t)filesystem.storageSize(), (uint32_t)filesystem.storageAvailable());
 			microStore::FileStore filestore;
 			if (filestore.init(filesystem, "./pfs_filestore")) {
 				printf("put: foo=bar\n");
@@ -158,7 +158,7 @@ void setup() {
 		microStore::FileSystem filesystem{microStore::Adapters::UniversalFileSystem()};
 		if (filesystem.init()) {
 			//filesystem.format();
-			printf("size=%u available=%u\n", filesystem.storageSize(), filesystem.storageAvailable());
+			printf("size=%u available=%u\n", (uint32_t)filesystem.storageSize(), (uint32_t)filesystem.storageAvailable());
 			microStore::FileStore filestore;
 		    if (filestore.init(filesystem, "./ufs_typedstore")) {
 				microStore::TypedStore<std::string, std::string, microStore::FileStore> store(filestore);

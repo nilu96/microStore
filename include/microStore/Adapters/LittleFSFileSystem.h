@@ -17,6 +17,7 @@
 
 #include "../File.h"
 #include "../FileSystem.h"
+#include "../Log.h"
 
 #include <LittleFS.h>
 
@@ -89,19 +90,19 @@ protected:
 	public:
 
 		inline virtual bool format() override {
-			printf("[ustore] Formatting LittleFSFileSystem\n");
+			USTORE_LOG("[ustore] Formatting LittleFSFileSystem\n");
 			if (!LittleFS.format()) {
-				printf("[ustore] Failed to format LittleFSFileSystem!\n");
+				USTORE_LOG("[ustore] Failed to format LittleFSFileSystem!\n");
 				return false;
 			}
 			return true;
 		}
 
 		inline virtual bool init(bool reformatOnFail = true) override {
-			printf("[ustore] Initializing LittleFSFileSystem\n");
+			USTORE_LOG("[ustore] Initializing LittleFSFileSystem\n");
 			// Initialize LittleFS
 			if (!LittleFS.begin(true, _basepath)) {
-				printf("[ustore] Failed to initialize LittleFSFileSystem!\n");
+				USTORE_LOG("[ustore] Failed to initialize LittleFSFileSystem!\n");
 				return false;
 			}
 			if (reformatOnFail) {
@@ -115,12 +116,12 @@ protected:
 					init_test.close();
 				}
 				if (!verified) {
-					printf("[ustore] WARNING: LittleFSFileSystem check failed, reformatting!\n");
+					USTORE_LOG("[ustore] WARNING: LittleFSFileSystem check failed, reformatting!\n");
 					format();
 				}
 				else {
 					remove("./__init_test__");
-					printf("[ustore] LittleFSFileSystem check passed!\n");
+					USTORE_LOG("[ustore] LittleFSFileSystem check passed!\n");
 				}
 			}
 			return true;

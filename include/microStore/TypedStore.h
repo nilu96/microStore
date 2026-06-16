@@ -15,6 +15,7 @@
 #pragma once
 
 #include "Codec.h"
+#include "Log.h"
 
 #include <vector>
 #include "Utility.h"
@@ -40,7 +41,7 @@ public:
     bool put(const Key& key, const Value& value, uint32_t ttl = 0, uint8_t priority = 0)
     {
         if (!isValid()) {
-			printf("[ustore] put: store is invalid\n");
+			USTORE_LOG("[ustore] put: store is invalid\n");
 			return false;
 		}
         auto k = KeyCodec::encode(key);
@@ -51,7 +52,7 @@ public:
     bool get(const Key& key, Value& value)
     {
         if (!isValid()) {
-			printf("[ustore] get: store is invalid\n");
+			USTORE_LOG("[ustore] get: store is invalid\n");
 			return false;
 		}
         auto k = KeyCodec::encode(key);
@@ -63,7 +64,7 @@ public:
     bool remove(const Key& key)
     {
         if (!isValid()) {
-			printf("[ustore] remove: store is invalid\n");
+			USTORE_LOG("[ustore] remove: store is invalid\n");
 			return false;
 		}
         auto k = KeyCodec::encode(key);
@@ -73,7 +74,7 @@ public:
     bool exists(const Key& key)
     {
         if (!isValid()) {
-			printf("[ustore] exists: store is invalid\n");
+			USTORE_LOG("[ustore] exists: store is invalid\n");
 			return false;
 		}
         auto k = KeyCodec::encode(key);
@@ -83,7 +84,7 @@ public:
     size_t size() const
     {
         if (!isValid()) {
-			printf("[ustore] size: store is invalid\n");
+			USTORE_LOG("[ustore] size: store is invalid\n");
 			return 0;
 		}
         return store.size();

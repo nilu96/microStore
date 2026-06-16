@@ -17,6 +17,7 @@
 
 #include "../File.h"
 #include "../FileSystem.h"
+#include "../Log.h"
 
 #include <InternalFileSystem.h>
 
@@ -89,25 +90,25 @@ protected:
 			// Adafruit_LittleFS File::seek() only supports absolute seeks (SEEK_SET).
 			// Emulate SEEK_CUR and SEEK_END by computing the absolute target position.
 			uint32_t target;
-//printf("[ustore] InternalFS: pre-position=%lu\n", _file->position());
+//USTORE_LOG("[ustore] InternalFS: pre-position=%lu\n", _file->position());
 			switch (mode) {
 				case microStore::SeekMode::SeekModeCur:
 					target = _file->position() + pos;
-//printf("[ustore] InternalFS: SeekModeCur pos=%lu, target=%lu\n", pos, target);
+//USTORE_LOG("[ustore] InternalFS: SeekModeCur pos=%lu, target=%lu\n", pos, target);
 					break;
 				case microStore::SeekMode::SeekModeEnd:
 					target = _file->size() + pos;
-//printf("[ustore] InternalFS: SeekModeEnd pos=%lu, target=%lu\n", pos, target);
+//USTORE_LOG("[ustore] InternalFS: SeekModeEnd pos=%lu, target=%lu\n", pos, target);
 					break;
 				case microStore::SeekMode::SeekModeSet:
 				default:
 					target = pos;
-//printf("[ustore] InternalFS: SeekModeSet pos=%lu, target=%lu\n", pos, target);
+//USTORE_LOG("[ustore] InternalFS: SeekModeSet pos=%lu, target=%lu\n", pos, target);
 					break;
 			}
 			//return _file->seek(target) ? (long)target : -1L;
 			long new_pos = _file->seek(target) ? (long)target : -1L;
-//printf("[ustore] InternalFS: new_pos=%ld, post-position=%lu\n", new_pos, _file->position());
+//USTORE_LOG("[ustore] InternalFS: new_pos=%ld, post-position=%lu\n", new_pos, _file->position());
 			return new_pos;
 		}
 /**/
@@ -126,19 +127,19 @@ protected:
 	public:
 
 		virtual bool format() override {
-			printf("[ustore] Formatting InternalFSFileSystem\n");
+			USTORE_LOG("[ustore] Formatting InternalFSFileSystem\n");
 			if (!InternalFS.format()) {
-				printf("[ustore] Failed to format InternalFSFileSystem!\n");
+				USTORE_LOG("[ustore] Failed to format InternalFSFileSystem!\n");
 				return false;
 			}
 			return true;
 		}
 
 		virtual bool init(bool reformatOnFail = true) override {
-			printf("[ustore] Initializing InternalFileSystem\n");
+			USTORE_LOG("[ustore] Initializing InternalFileSystem\n");
 			// Initialize InternalFileSystem
 			if (!InternalFS.begin()) {
-				printf("[ustore] Failed to initialize InternalFSFileSystem!\n");
+				USTORE_LOG("[ustore] Failed to initialize InternalFSFileSystem!\n");
 				return false;
 			}
 			if (reformatOnFail) {
@@ -152,12 +153,12 @@ protected:
 					init_test.close();
 				}
 				if (!verified) {
-					printf("[ustore] WARNING: InternalFSFileSystem check failed, reformatting!\n");
+					USTORE_LOG("[ustore] WARNING: InternalFSFileSystem check failed, reformatting!\n");
 					format();
 				}
 				else {
 					remove("./__init_test__");
-					printf("[ustore] InternalFSFileSystem check passed!\n");
+					USTORE_LOG("[ustore] InternalFSFileSystem check passed!\n");
 				}
 			}
 			return true;
@@ -202,7 +203,7 @@ protected:
 					return {};
 			}
 			Adafruit_LittleFS_Namespace::File* file = new Adafruit_LittleFS_Namespace::File(InternalFS);
-//printf("[ustore] opening file: %s, mode: %u\n", path, pmode);
+//USTORE_LOG("[ustore] opening file: %s, mode: %u\n", path, pmode);
 			if (!file->open(path, pmode)) {
 				return {};
 			}

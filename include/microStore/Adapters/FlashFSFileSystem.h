@@ -164,7 +164,7 @@ protected:
 			_transportPtr(new (&_transport.spi) Adafruit_FlashTransport_SPI(ss, SPI)),
 			_flash(_transportPtr) {}
 	    virtual ~FileSystemImpl() {
-			_transport.qspi.~Adafruit_FlashTransport_SPI();
+			_transport.spi.~Adafruit_FlashTransport_SPI();
 		}
 		#endif
 

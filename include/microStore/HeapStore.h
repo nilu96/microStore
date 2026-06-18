@@ -69,7 +69,7 @@ public:
 
     /* -------- PUT -------- */
 
-    bool put(const uint8_t* key, uint8_t key_len, const void* data, uint16_t len, uint32_t ttl = 0, uint32_t ts = microStore::time())
+    bool put(const uint8_t* key, uint8_t key_len, const void* data, uint16_t len, uint32_t ttl = 0, uint32_t ts = microStore::time(), uint8_t priority = 0)
     {
         if (!isValid()) return false;
 
@@ -107,19 +107,19 @@ public:
         return true;
     }
 
-    inline bool put(const char* key, const void* data, uint16_t len, uint32_t ttl = 0, uint32_t ts = microStore::time())
+    inline bool put(const char* key, const void* data, uint16_t len, uint32_t ttl = 0, uint32_t ts = microStore::time(), uint8_t priority = 0)
     {
-        return put((const uint8_t*)key, (uint8_t)strlen(key), data, len, ttl, ts);
+        return put((const uint8_t*)key, (uint8_t)strlen(key), data, len, ttl, ts, priority);
     }
 
-    inline bool put(const std::vector<uint8_t>& key, const void* data, uint16_t len, uint32_t ttl = 0, uint32_t ts = microStore::time())
+    inline bool put(const std::vector<uint8_t>& key, const void* data, uint16_t len, uint32_t ttl = 0, uint32_t ts = microStore::time(), uint8_t priority = 0)
     {
-        return put(key.data(), (uint8_t)key.size(), data, len, ttl, ts);
+        return put(key.data(), (uint8_t)key.size(), data, len, ttl, ts, priority);
     }
 
-    inline bool put(const std::vector<uint8_t>& key, const std::vector<uint8_t>& data, uint32_t ttl = 0, uint32_t ts = microStore::time())
+    inline bool put(const std::vector<uint8_t>& key, const std::vector<uint8_t>& data, uint32_t ttl = 0, uint32_t ts = microStore::time(), uint8_t priority = 0)
     {
-        return put(key.data(), (uint8_t)key.size(), data.data(), (uint16_t)data.size(), ttl, ts);
+        return put(key.data(), (uint8_t)key.size(), data.data(), (uint16_t)data.size(), ttl, ts, priority);
     }
 
     /* -------- GET -------- */

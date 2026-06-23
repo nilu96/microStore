@@ -303,8 +303,14 @@ protected:
 		inline virtual bool mkdir(const char* path) override {
 			struct stat st = {0};
 			if (::stat(path, &st) == 0) {
-				return true;
+				if (S_ISDIR(st.st_mode)) {
+					//USTORE_LOG("[ustore] mkdir: Directory %s already exists\n", path);
+					return true;
+				}
+				//USTORE_LOG("[ustore] mkdir: Path %s already exists but is not a directory\n", path);
+				return false;
 			}
+			//USTORE_LOG("[ustore] mkdir: Creating directory %s\n", path);
 			return (::mkdir(path, 0700) == 0);
 		}
 
@@ -326,7 +332,7 @@ protected:
 
 		inline virtual bool isDirectory(const char* path) override {
 			struct stat st = {0};
-			return (::stat(path, &st) == 0);
+			return (::stat(path, &st) == 0 && S_ISDIR(st.st_mode));
 		}
 
 		virtual std::list<std::string> listDirectory(const char* path, Callbacks::DirectoryListing callback = nullptr) override {

@@ -145,7 +145,20 @@ public:
 		USTORE_LOG("[ustore] init: Initializing FileStore with prefix=%s, segment_size=%u, segment_count=%u\n", prefix, _segment_size, _segment_count);
 
 		_filesystem = filesystem;
-		strncpy(base_prefix, prefix, sizeof(base_prefix));
+		strncpy(base_prefix, prefix, sizeof(base_prefix) - 1);
+		base_prefix[sizeof(base_prefix) - 1] = '\0';
+
+		// Directory-mode prefix: a trailing '/' means base_prefix is a folder
+		// and generated names omit the usual leading '_'. Try to create it;
+		// failure is fine (typically it already exists).
+		{
+			size_t n = strlen(base_prefix);
+			if (n > 0 && base_prefix[n - 1] == '/') {
+				base_prefix[n - 1] = '\0';
+				if (!_filesystem.mkdir(base_prefix)) USTORE_LOG("[ustore] init: Failed to create directory %s\n", base_prefix);
+				base_prefix[n - 1] = '/';
+			}
+		}
 
 		if (clearOnInit) {
 			clear();
@@ -1064,19 +1077,31 @@ USTORE_LOG("[ustore] Evicted %lu records to policy_max_recs\n", to_evict);
 
 	/* -------- SEGMENTS -------- */
 
+	// Returns "" when base_prefix ends with '/' (directory mode), else "_".
+	inline const char* prefix_sep() const
+	{
+		size_t n = strlen(base_prefix);
+		return (n > 0 && base_prefix[n - 1] == '/') ? "" : "_";
+	}
+
 	void segment_name(uint32_t id,char* out)
 	{
-		snprintf(out, USTORE_MAX_FILENAME_LEN, "%s_%u.dat", base_prefix,id);
+		snprintf(out, USTORE_MAX_FILENAME_LEN, "%s%sseg%u.dat", base_prefix, prefix_sep(), id);
 	}
 
 	void index_name(char* out)
 	{
-		snprintf(out, USTORE_MAX_FILENAME_LEN, "%s_index.dat", base_prefix);
+		snprintf(out, USTORE_MAX_FILENAME_LEN, "%s%sindex.dat", base_prefix, prefix_sep());
 	}
 
 	void journal_name(char* out)
 	{
-		snprintf(out, USTORE_MAX_FILENAME_LEN, "%s_journal.dat", base_prefix);
+		snprintf(out, USTORE_MAX_FILENAME_LEN, "%s%sjournal.dat", base_prefix, prefix_sep());
+	}
+
+	void tmp_name(char* out)
+	{
+		snprintf(out, USTORE_MAX_FILENAME_LEN, "%s%scompact.tmp", base_prefix, prefix_sep());
 	}
 
 	bool open_segment(uint32_t id)
@@ -1197,7 +1222,7 @@ USTORE_LOG("[ustore] Compaction triggered by deleted threshold\n");
 			return;
 		}
 
-		char tmp_name[USTORE_MAX_FILENAME_LEN]; snprintf(tmp_name, sizeof(tmp_name), "%s_compact.tmp", base_prefix);
+		char tmp_path[USTORE_MAX_FILENAME_LEN]; tmp_name(tmp_path);
 
 		if (j.state == JOURNAL_COMMIT) {
 			// Tmp file is complete — finish the swap.
@@ -1205,7 +1230,7 @@ USTORE_LOG("[ustore] Compaction triggered by deleted threshold\n");
 		} else if (j.next_seg == 0) {
 			// COMPACTING, no source segments deleted yet — tmp may be partial, discard it.
 			// All original segments are intact; normal boot proceeds.
-			_filesystem.remove(tmp_name);
+			_filesystem.remove(tmp_path);
 		} else {
 			// COMPACTING with next_seg > 0: source segments 0..next_seg-1 have been deleted.
 			// compact.tmp holds their live records up to byte tmp_valid_size (bytes beyond
@@ -1217,7 +1242,7 @@ USTORE_LOG("[ustore] Compaction triggered by deleted threshold\n");
 			// boot index rebuild picks it up alongside the surviving segments next_seg..7.
 			// The next compaction cycle will consolidate everything correctly.
 			char seg0[USTORE_MAX_FILENAME_LEN]; segment_name(0, seg0);
-			if (!_filesystem.rename(tmp_name, seg0)) {
+			if (!_filesystem.rename(tmp_path, seg0)) {
 				// Rename failed (e.g. filesystem error). Best effort: leave compact.tmp
 				// in place; the next boot will retry this same recovery path.
 				return;  // keep journal so next boot retries
@@ -1231,8 +1256,7 @@ USTORE_LOG("[ustore] Compaction triggered by deleted threshold\n");
 
 	void finalize_compaction()
 	{
-		char tmp_name[USTORE_MAX_FILENAME_LEN];
-		snprintf(tmp_name, sizeof(tmp_name), "%s_compact.tmp", base_prefix);
+		char tmp_path[USTORE_MAX_FILENAME_LEN]; tmp_name(tmp_path);
 		char seg0[USTORE_MAX_FILENAME_LEN];
 		segment_name(0, seg0);
 
@@ -1243,8 +1267,8 @@ USTORE_LOG("[ustore] Compaction triggered by deleted threshold\n");
 USTORE_LOG("[ustore] Removing file: %s\n", sname);
 			_filesystem.remove(sname);
 		}
-		if (!_filesystem.rename(tmp_name, seg0)) {
-			_filesystem.remove(tmp_name);
+		if (!_filesystem.rename(tmp_path, seg0)) {
+			_filesystem.remove(tmp_path);
 			return;
 		}
 
@@ -1340,9 +1364,9 @@ USTORE_LOG("[ustore] Compacting storage...\n");
 		// --- Phase 1: write COMPACTING journal (next_seg=0: no source segments deleted yet) ---
 		write_journal(JOURNAL_COMPACTING, 0, 0);
 
-		char tmp_name[USTORE_MAX_FILENAME_LEN]; snprintf(tmp_name, sizeof(tmp_name), "%s_compact.tmp", base_prefix);
-USTORE_LOG("[ustore] Opening tmp file: %s\n", tmp_name);
-		File outf = _filesystem.open(tmp_name, File::ModeWrite);
+		char tmp_path[USTORE_MAX_FILENAME_LEN]; tmp_name(tmp_path);
+USTORE_LOG("[ustore] Opening tmp file: %s\n", tmp_path);
+		File outf = _filesystem.open(tmp_path, File::ModeWrite);
 		if (!outf) { clear_journal(); return false; }
 
 		// --- Phase 2 + 3 fused: stream live offsets one segment at a time ---
@@ -1441,14 +1465,14 @@ USTORE_LOG("[ustore] Closing src file: %s\n", src_name);
 		}
 
 		outf.flush();
-USTORE_LOG("[ustore] Closing tmp file: %s\n", tmp_name);
+USTORE_LOG("[ustore] Closing tmp file: %s\n", tmp_path);
 		outf.close();
 
 		if (!write_ok) {
 			if (committed_segs == 0) {
 				// No source segments were deleted — safe to discard compact.tmp entirely.
 				USTORE_LOG("[ustore] Compact aborted: storage full, all segments preserved\n");
-				_filesystem.remove(tmp_name);
+				_filesystem.remove(tmp_path);
 				clear_journal();
 			} else {
 				// Some source segments were already deleted; compact.tmp holds their records.
@@ -1476,7 +1500,7 @@ private:
 
 	FileSystem _filesystem;
 
-	char base_prefix[32];
+	char base_prefix[USTORE_MAX_FILENAME_LEN];
 	uint32_t _segment_size = USTORE_DEFAULT_SEGMENT_SIZE;
 	uint8_t _segment_count = USTORE_DEFAULT_SEGMENT_COUNT;
 

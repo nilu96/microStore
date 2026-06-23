@@ -669,6 +669,109 @@ void test_file_store_compact_basic() {
     TEST_ASSERT_EQUAL(0, memcmp(buf, "v3", 2));
 }
 
+/* ===========================================================================
+ * Directory-mode prefix tests
+ *
+ * When the prefix passed to init() ends with '/', FileStore should treat it as
+ * a directory: generated files become "{prefix}0.dat", "{prefix}index.dat",
+ * "{prefix}journal.dat", "{prefix}compact.tmp" (no leading '_'). When the
+ * prefix does NOT end with '/', the legacy '_' separator must still be used.
+ * =========================================================================== */
+
+// Directory-mode prefix produces files with '/' as the separator.
+void test_dir_prefix_segment_and_index_names() {
+    reset_ram_fs();
+
+    {
+        microStore::FileStore writer;
+        auto fs = make_ram_fs();
+        writer.init(fs, "sub/");
+        writer.put("a", "hi", /*ttl=*/0, microStore::time());
+    }
+
+    TEST_ASSERT_TRUE(find_file("sub/seg0.dat") >= 0);
+    TEST_ASSERT_TRUE(find_file("sub/index.dat") >= 0);
+    // Underscore-mode names must NOT exist.
+    TEST_ASSERT_TRUE(find_file("sub_seg0.dat") < 0);
+    TEST_ASSERT_TRUE(find_file("sub_index.dat") < 0);
+}
+
+// Legacy (non-directory) prefix behavior is preserved exactly.
+void test_legacy_prefix_unchanged() {
+    reset_ram_fs();
+
+    {
+        microStore::FileStore writer;
+        auto fs = make_ram_fs();
+        writer.init(fs, "leg");
+        writer.put("a", "hi", /*ttl=*/0, microStore::time());
+    }
+
+    TEST_ASSERT_TRUE(find_file("leg_seg0.dat") >= 0);
+    TEST_ASSERT_TRUE(find_file("leg_index.dat") >= 0);
+    TEST_ASSERT_TRUE(find_file("leg/seg0.dat") < 0);
+}
+
+// Re-init on a directory-mode store reloads the persisted index and prior
+// records read back correctly. Covers load_index() name resolution.
+void test_dir_prefix_reload_index() {
+    reset_ram_fs();
+
+    uint32_t now = microStore::time();
+    {
+        microStore::FileStore writer;
+        auto fs = make_ram_fs();
+        writer.init(fs, "sub/");
+        writer.put("a", "v1", /*ttl=*/0, now);
+        writer.put("b", "v2", /*ttl=*/0, now + 1);
+    }
+
+    microStore::FileStore reader;
+    auto fs = make_ram_fs();
+    reader.init(fs, "sub/");
+    TEST_ASSERT_EQUAL(2u, reader.size());
+
+    uint8_t buf[8]; uint16_t sz = sizeof(buf);
+    TEST_ASSERT_TRUE(reader.get("a", buf, &sz));
+    TEST_ASSERT_EQUAL(2u, sz);
+    TEST_ASSERT_EQUAL(0, memcmp(buf, "v1", 2));
+}
+
+// Compaction with a directory-mode prefix uses the directory-scoped
+// compact.tmp path and leaves the post-compaction layout under the directory.
+void test_dir_prefix_compact() {
+    reset_ram_fs();
+
+    uint32_t now = microStore::time();
+    {
+        microStore::FileStore writer;
+        auto fs = make_ram_fs();
+        writer.init(fs, "sub/");
+        writer.put("a", "v1", /*ttl=*/0, now);
+        writer.put("a", "v2", /*ttl=*/0, now + 1);   // overwrite
+        writer.put("b", "v3", /*ttl=*/0, now + 2);
+    }
+
+    microStore::FileStore reader;
+    auto fs = make_ram_fs();
+    reader.init(fs, "sub/");
+    TEST_ASSERT_EQUAL(2u, reader.size());
+
+    TEST_ASSERT_TRUE(reader.compact());
+
+    // compact.tmp must have been removed after finalize.
+    TEST_ASSERT_TRUE(find_file("sub/compact.tmp") < 0);
+    TEST_ASSERT_TRUE(find_file("sub_compact.tmp") < 0);
+    // Records still readable post-compact.
+    TEST_ASSERT_TRUE(reader.exists("a"));
+    TEST_ASSERT_TRUE(reader.exists("b"));
+
+    uint8_t buf[8]; uint16_t sz = sizeof(buf);
+    TEST_ASSERT_TRUE(reader.get("a", buf, &sz));
+    TEST_ASSERT_EQUAL(2u, sz);
+    TEST_ASSERT_EQUAL(0, memcmp(buf, "v2", 2));
+}
+
 /* ---- Main ---- */
 
 void setUp()    {}
@@ -697,6 +800,11 @@ int runUnityTests(void) {
     // Additional edge-case tests
     RUN_TEST(test_file_store_ttl_exists_expires);
     RUN_TEST(test_file_store_compact_basic);
+    // Directory-mode prefix
+    RUN_TEST(test_dir_prefix_segment_and_index_names);
+    RUN_TEST(test_legacy_prefix_unchanged);
+    RUN_TEST(test_dir_prefix_reload_index);
+    RUN_TEST(test_dir_prefix_compact);
     return UNITY_END();
 }
 

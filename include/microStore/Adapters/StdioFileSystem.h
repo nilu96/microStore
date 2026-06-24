@@ -289,13 +289,14 @@ protected:
 
 		inline virtual bool isDirectory(const char* path) override {
 			struct stat st = {0};
-			return (::stat(path, &st) == 0);
+			return (::stat(path, &st) == 0 && S_ISDIR(st.st_mode));
 		}
 
 		inline virtual bool mkdir(const char* path) override {
 			struct stat st = {0};
 			if (::stat(path, &st) == 0) {
-				return true;
+				if (S_ISDIR(st.st_mode)) return true;
+				return false;
 			}
 			return (::mkdir(path, 0700) == 0);
 		}

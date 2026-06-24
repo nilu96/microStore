@@ -210,11 +210,9 @@ protected:
 			}
 			fs::File file = root.openNextFile();
 			while (file) {
-				if (!file.isDirectory()) {
-					char* name = (char*)file.name();
-					if (callback) callback(name);
-					else files.push_back(name);
-				}
+				char* name = (char*)file.name();
+				if (callback) callback(name);
+				else files.push_back(name);
 				// CBA Following close required to avoid leaking memory
 				file.close();
 				file = root.openNextFile();

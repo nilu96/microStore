@@ -155,6 +155,7 @@ public:
 			size_t n = strlen(base_prefix);
 			if (n > 0 && base_prefix[n - 1] == '/') {
 				base_prefix[n - 1] = '\0';
+				USTORE_LOG("[ustore] init: Creating directory %s\n", base_prefix);
 				if (!_filesystem.mkdir(base_prefix)) USTORE_LOG("[ustore] init: Failed to create directory %s\n", base_prefix);
 				base_prefix[n - 1] = '/';
 			}
